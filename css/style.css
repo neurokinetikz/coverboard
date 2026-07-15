@@ -208,7 +208,16 @@ input[type="range"] { accent-color: var(--accent); }
   display: inline-flex; align-items: center; gap: 5px;
 }
 .key-chip .kx { color: var(--accent); font-size: 17px; line-height: 1; }
-.key-chip .kc-caret { font-size: 13px; color: var(--text-dim); }
+/* capo: its own chip beside the key group — same accent family, clearly
+   separate from the transpose controls */
+.capo-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 700; color: var(--text-dim);
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-inset));
+  border: 1.5px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 8px; padding: 6px 11px;
+}
+.capo-chip b { color: var(--accent); font-size: 15px; line-height: 1; }
 .key-chip .was { color: var(--text-dim); font-weight: 500; font-size: 11.5px; }
 .key-chip:hover { filter: brightness(1.12); }
 

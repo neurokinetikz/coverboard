@@ -578,7 +578,10 @@
         keyLabel = '<span class="kx">' + esc(keyName) + '</span>';
       }
     }
-    var capoChip = song.capo ? '<span class="chip">Capo ' + esc(song.capo) + '</span>' : '';
+    var capoChip = song.capo
+      ? '<span class="capo-chip" title="Capo fret (edit the song to change)">Capo <b>' +
+        esc(song.capo) + '</b></span>'
+      : '';
 
     var performBar = '';
     if (App.state.perform) {
@@ -599,9 +602,8 @@
       '<div class="tb-left">' +
       '<button class="icon" data-act="toggle-sidebar" title="Library">☰</button>' +
       '<div class="tgroup keygrp" title="Key — click to change">' +
-        '<button class="key-chip" data-act="key-menu">Key ' + keyLabel +
-          '<span class="kc-caret">▾</span></button>' +
         '<button data-act="transpose" data-d="-1" title="Down a semitone">−</button>' +
+        '<button class="key-chip" data-act="key-menu">Key ' + keyLabel + '</button>' +
         '<button data-act="transpose" data-d="1" title="Up a semitone">＋</button>' +
         (tr ? '<button data-act="transpose" data-d="0" title="Reset to original key">⟲</button>' : '') +
       '</div>' +
