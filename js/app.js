@@ -275,7 +275,8 @@
     var extraLabel = has7 && has6 ? '7th·6th' : has7 ? '7th' : has6 ? '6th' : '';
     var out = ['<div class="triad-strip" id="triad-strip">'];
     out.push('<div class="ts-head"><span class="ts-lab">Triads' +
-      (result.key ? ' · key ' + esc(result.key.name) : '') + '</span>' +
+      (result.key ? ' · key' : '') + '</span>' +
+      (result.key ? '<span class="sub-key">' + esc(result.key.name) + '</span>' : '') +
       triadLegendHTML(extraLabel));
     if (result.key) {
       out.push('<span class="ts-sub">Position</span><span class="pos-seg">');
@@ -594,17 +595,21 @@
 
     var fit = !!settings.fitMode;
     return performBar +
-      '<div class="toolbar">' +
+      '<div class="toolbar song-tb">' +
+      '<div class="tb-left">' +
       '<button class="icon" data-act="toggle-sidebar" title="Library">☰</button>' +
-      '<div class="titleblock"><div class="t">' + esc(song.title) + '</div>' +
-      '<div class="a">' + esc(song.artist || '') + '</div></div>' +
       '<div class="tgroup keygrp" title="Key — click to change">' +
-        '<button class="key-chip" data-act="key-menu">Key ' + keyLabel + ' ▾</button>' +
+        '<button class="key-chip" data-act="key-menu">Key ' + keyLabel +
+          '<span class="kc-caret">▾</span></button>' +
         '<button data-act="transpose" data-d="-1" title="Down a semitone">−</button>' +
         '<button data-act="transpose" data-d="1" title="Up a semitone">＋</button>' +
         (tr ? '<button data-act="transpose" data-d="0" title="Reset to original key">⟲</button>' : '') +
       '</div>' +
       capoChip +
+      '</div>' +
+      '<div class="tb-center"><div class="titleblock"><div class="t">' + esc(song.title) + '</div>' +
+      '<div class="a">' + esc(song.artist || '') + '</div></div></div>' +
+      '<div class="tb-right">' +
       '<div class="tgroup" title="' + (fit ? 'Max font size (Fit picks the largest that fits)' : 'Font size') + '"><span class="lbl">A</span>' +
         '<button data-act="font" data-d="-1">−</button>' +
         '<button data-act="font" data-d="1">＋</button>' +
@@ -620,7 +625,7 @@
       '<button data-act="edit-song" title="Edit">✎</button>' +
       '<button data-act="print" class="icon" title="Print">⎙</button>' +
       '<button data-act="delete-song" class="icon danger" title="Delete">🗑</button>' +
-      '</div>' +
+      '</div></div>' +
       '<div class="song-scroll' + (fit ? ' fit' : '') + '" id="song-scroll"><div class="song-body">' +
       (settings.showTriads ? triadStripHTML(parsed, tr, flat, song)
         : settings.showDiagrams ? diagramStripHTML(parsed, tr, flat) : '') +
