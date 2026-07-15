@@ -1873,7 +1873,6 @@
 
   /* ---------- boot ---------- */
 
-  Store.seedIfEmpty();
   Auto.speed = Store.getSettings().scrollSpeed || 30;
   document.documentElement.setAttribute('data-theme', Store.getSettings().theme || 'dark');
   readHash();

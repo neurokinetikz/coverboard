@@ -46,8 +46,7 @@
         triadPos: 'any',       // triad strip CAGED position ('any' | '1'..'5')
         triadStrings: '1-3',   // triad strip string set ('1-3'|'2-4'|'3-5'|'4-6')
         sidebarCollapsed: false // desktop: hide the library panel
-      },
-      seeded: false
+      }
     };
   }
 
@@ -279,75 +278,6 @@
     return added;
   }
 
-  /* ---------- seed songs (public domain / traditional) ---------- */
-
-  var SEEDS = [
-    {
-      title: 'Amazing Grace', artist: 'Traditional',
-      raw: [
-        'Key: G', 'Capo: 0', '',
-        '[Verse 1]',
-        'G          G7         C        G',
-        'Amazing grace how sweet the sound',
-        '                       D    D7',
-        'That saved a wretch like me',
-        'G        G7        C      G',
-        'I once was lost but now am found',
-        '     Em       D     G',
-        'Was blind but now I see', '',
-        '[Verse 2]',
-        'G            G7            C       G',
-        "'Twas grace that taught my heart to fear",
-        '                    D     D7',
-        'And grace my fears relieved',
-        'G           G7        C          G',
-        'How precious did that grace appear',
-        '    Em      D       G',
-        'The hour I first believed'
-      ].join('\n')
-    },
-    {
-      title: 'House of the Rising Sun', artist: 'Traditional',
-      raw: [
-        '[Intro]',
-        'Am  C  D  F  Am  E  Am  E', '',
-        '[Verse 1]',
-        'Am       C        D          F',
-        'There is a house in New Orleans',
-        'Am       C      E   E',
-        'They call the Rising Sun',
-        'Am        C       D            F',
-        "And it's been the ruin of many a poor boy",
-        'Am     E        Am   E',
-        'And God I know I\'m one', '',
-        '[Instrumental]',
-        'Am  C  D  F  Am  E  Am  E'
-      ].join('\n')
-    },
-    {
-      title: 'Scarborough Fair', artist: 'Traditional',
-      raw: [
-        '[Verse 1]',
-        'Am                    G       Am',
-        'Are you going to Scarborough Fair?',
-        'C        Am       C   D    Am',
-        'Parsley, sage, rosemary and thyme',
-        'Am    C           G           Em',
-        'Remember me to one who lives there',
-        'Am         G            Am',
-        'She once was a true love of mine'
-      ].join('\n')
-    }
-  ];
-
-  function seedIfEmpty() {
-    load();
-    if (state.seeded || state.songs.length) { state.seeded = true; save(); return; }
-    SEEDS.forEach(function (seed) { addSong(seed); });
-    state.seeded = true;
-    save();
-  }
-
   var api = {
     load: load,
     listSongs: listSongs, getSong: getSong, addSong: addSong,
@@ -358,7 +288,6 @@
     exportJSON: exportJSON, importJSON: importJSON,
     serializeState: serializeState, replaceState: replaceState,
     onSave: null,
-    seedIfEmpty: seedIfEmpty,
     _resetForTests: function () { state = null; memoryStore = {}; parseCache = {}; }
   };
 
