@@ -178,10 +178,21 @@
     return out.join('');
   }
 
-  function diagramStripHTML(parsed, tr, flat) {
+  function diagramStripHTML(parsed, tr, flat, song) {
     if (!parsed.chords.length) return '';
     var settings = Store.getSettings();
-    var seen = {}, out = ['<div class="diagram-strip">'];
+    // scale card for the chords strip: anchored to the key's LOWEST position
+    // (matches the mostly-open grips this strip shows)
+    var scaleKey = null, scaleLow = null;
+    if (TR && FB && song) {
+      scaleKey = effectiveKey(song, parsed);
+      if (!scaleKey) {
+        var dispSyms = parsed.chords.map(function (c) { return dispChord(c, tr, flat); });
+        scaleKey = CT.detectKey(dispSyms);
+      }
+      if (scaleKey) scaleLow = TR.positionsForKey(scaleKey.pc, scaleKey.minor)[0] || null;
+    }
+    var seen = {}, out = ['<div class="diagram-strip' + (scaleLow ? ' has-scale' : '') + '">'];
     parsed.chords.forEach(function (sym) {
       var d = dispChord(sym, tr, flat);
       var p = CT.parseChord(d);
@@ -194,6 +205,12 @@
         '" title="' + esc(d) + ' — tap for substitutions">' +
         DG.renderChordSVG(voicings[0], { label: d, showFingers: settings.showFingers }) + '</span>');
     });
+    if (scaleLow && out.length > 1) {
+      var kf = CT.keyPrefersFlat(scaleKey.pc, scaleKey.minor);
+      out.push(scaleZoneHTML({ pc: scaleKey.pc, minor: scaleKey.minor,
+        name: scaleKey.name || (CT.pcName(scaleKey.pc, kf) + (scaleKey.minor ? 'm' : '')) },
+        scaleLow, kf));
+    }
     out.push('</div>');
     return out.length > 2 ? out.join('') : '';
   }
@@ -298,12 +315,17 @@
         id + '">' + id + '</button>');
     });
     out.push('</span>');
+    var scalePos = null;
+    if (FB && result.key && pos !== 'any') {
+      scalePos = result.positions[parseInt(pos, 10) - 1] || null;
+    }
     if (result.key) {
       out.push('<button class="mini ts-explore" data-act="view-fretboard" data-root="' +
         result.key.pc + '" data-quality="' + (result.key.minor ? 'min' : 'maj') +
+        '" data-scale="pent" data-spell="' + (result.preferFlat ? 'flat' : 'sharp') +
         '">Explore neck →</button>');
     }
-    out.push('</div><div class="ts-tiles">');
+    out.push('</div><div class="ts-tiles' + (scalePos ? ' has-scale' : '') + '">');
 
     // the origin-badge row costs a line above every chart — only render it
     // when some chord in the song was actually reduced
@@ -335,8 +357,67 @@
       }
       out.push('</span>');
     });
+
+    // scale zone: the key's pentatonic + its parallel flavor, anchored at
+    // the strip's right edge
+    if (scalePos) {
+      out.push(scaleZoneHTML(result.key, scalePos, result.preferFlat));
+    }
     out.push('</div></div>');
     return out.join('');
+  }
+
+  /* one pentatonic-box card: pc+minor pick the flavor, position picks the box.
+     Titles are chord-style ("E", "Em") — the zone header says "pentatonics" */
+  function scaleCardHTML(pc, minorFlavor, title, position, preferFlat, active) {
+    var box = TR.pentBoxDots(pc, minorFlavor, position);
+    var scDots = box.dots.map(function (n) {
+      return n.interval === 0
+        ? { string: n.string, fret: n.fret, role: 'R' }
+        : { string: n.string, fret: n.fret, role: n.role, ghost: true };
+    });
+    scDots.sort(function (a, b) { return (b.ghost ? 1 : 0) - (a.ghost ? 1 : 0); });
+    return '<span class="ts-scale' + (active ? ' active' : '') +
+      '" data-act="view-fretboard" data-root="' +
+      pc + '" data-quality="' + (minorFlavor ? 'min' : 'maj') +
+      '" data-scale="pent" data-spell="' + (preferFlat ? 'flat' : 'sharp') +
+      '" title="' + esc(title + ' pentatonic in this position — tap to explore') + '">' +
+      '<span class="ts-neck">' + DG.renderScaleSVG({
+        startFret: box.lo, endFret: box.hi, dots: scDots,
+        label: title,
+        ariaLabel: title + ' pentatonic, ' +
+          (box.lo === 0 ? 'open position' : 'frets ' + box.lo + '-' + box.hi)
+      }) + '</span>' +
+      '<span class="ts-cap">' + esc(position.shape + ' shape · ' +
+        (position.frame === 0 ? 'open' : position.frame + 'fr')) + '</span></span>';
+  }
+
+  /* the strip's scale zone: header ("pentatonics" + neck link) over the
+     key's own pentatonic plus its PARALLEL flavor (the blues pairing), each
+     in its own true pattern box nearest the selected position */
+  function scaleZoneHTML(key, sp, preferFlat) {
+    var tonic = CT.pcName(key.pc, preferFlat);
+    var primaryTitle = tonic + (key.minor ? 'm' : '');
+    var parallelTitle = tonic + (key.minor ? '' : 'm');
+
+    // the parallel flavor's box nearest this neck region
+    var primaryBox = TR.pentBoxDots(key.pc, key.minor, sp);
+    var center = (primaryBox.lo + primaryBox.hi) / 2;
+    var parallelPos = null, bd = Infinity;
+    TR.positionsForKey(key.pc, !key.minor).forEach(function (p) {
+      var b = TR.pentBoxDots(key.pc, !key.minor, p);
+      var d = Math.abs((b.lo + b.hi) / 2 - center);
+      if (d < bd) { bd = d; parallelPos = p; }
+    });
+
+    return '<span class="ts-scale-zone">' +
+      '<span class="ts-zone-head"><span class="ts-lab">Pentatonics</span></span>' +
+      '<span class="ts-zone-cards">' +
+      scaleCardHTML(key.pc, key.minor, primaryTitle, sp, preferFlat, true) +
+      (parallelPos
+        ? scaleCardHTML(key.pc, !key.minor, parallelTitle, parallelPos, preferFlat, false)
+        : '') +
+      '</span></span>';
   }
 
   /* Swap just the strip (keeps the song's scroll position mid-practice). */
@@ -630,7 +711,7 @@
       '</div></div>' +
       '<div class="song-scroll' + (fit ? ' fit' : '') + '" id="song-scroll"><div class="song-body">' +
       (settings.showTriads ? triadStripHTML(parsed, tr, flat, song)
-        : settings.showDiagrams ? diagramStripHTML(parsed, tr, flat) : '') +
+        : settings.showDiagrams ? diagramStripHTML(parsed, tr, flat, song) : '') +
       sectionsHTML(parsed, { transpose: tr, preferFlat: flat }) +
       '</div></div>';
   }
@@ -705,7 +786,8 @@
     if (!App.state.explorer) {
       App.state.explorer = { rootPc: 0, quality: 'maj', stringSet: 'all',
                              inversion: 'any', labels: 'intervals', caged: false,
-                             spell: 'auto' };  // 'auto' | 'sharp' | 'flat'
+                             spell: 'auto',    // 'auto' | 'sharp' | 'flat'
+                             scale: 'none' };  // 'none' | 'pent' | 'full'
     }
     return App.state.explorer;
   }
@@ -731,6 +813,9 @@
              : CT.keyPrefersFlat(ex.rootPc, minorish);
     var title = CT.pcName(ex.rootPc, flat) + TR.TRIAD_SUFFIX[ex.quality];
     var setObj = ex.stringSet === 'all' ? null : FB_SETS[ex.stringSet];
+    var scaleOk = TR.scaleForQuality(ex.quality, 'pent') !== null;
+    var scaleId = ex.scale === 'none' || !scaleOk
+      ? null : TR.scaleForQuality(ex.quality, ex.scale);
 
     // dots: full tone cloud, or actual voicings when a string set is chosen
     var dots = [];
@@ -773,6 +858,23 @@
                       label: noteLabel(n), title: noteTitle(n, s) });
         });
       });
+    }
+
+    // scale layer: ghost dots on every position not already occupied by an
+    // emitted chord dot; neck-wide (the Strings filter scopes voicings, not
+    // key context), painted first so chord tones sit on top
+    if (scaleId) {
+      var occupied = {};
+      dots.forEach(function (d) { occupied[d.string + ':' + d.fret] = 1; });
+      var ghosts = [];
+      TR.scaleMap(ex.rootPc, scaleId, { maxFret: maxFret }).strings.forEach(function (arr, s) {
+        arr.forEach(function (n) {
+          if (occupied[s + ':' + n.fret]) return;
+          ghosts.push({ string: s, fret: n.fret, role: n.role, ghost: true,
+                        title: noteTitle(n, s) });
+        });
+      });
+      dots = ghosts.concat(dots);
     }
 
     // CAGED region shading (meaningful for the maj/min-rooted qualities)
@@ -828,6 +930,12 @@
         ], ex.inversion, !setObj) +
         (!setObj ? '<span class="fb-hint">pick a string set to filter inversions</span>' : '') +
       '</div>' +
+      '<div class="fb-crow"><span class="lbl">Scale</span>' +
+        fbSeg('fb-scale', [
+          { v: 'none', l: 'None' }, { v: 'pent', l: 'Pentatonic' }, { v: 'full', l: 'Full scale' }
+        ], ex.scale, !scaleOk) +
+        (!scaleOk ? '<span class="fb-hint">pick a maj/min-rooted quality</span>' : '') +
+      '</div>' +
       '<div class="fb-crow"><span class="lbl">Show</span>' +
         fbSeg('fb-labels', [{ v: 'intervals', l: 'Intervals' }, { v: 'names', l: 'Notes' }], ex.labels) +
         '<button class="mini' + (ex.caged && cagedOk ? ' active' : '') +
@@ -835,7 +943,8 @@
           ' title="Shade the five CAGED position windows">CAGED overlay</button>' +
       '</div></div>';
 
-    var ariaTitle = CT.pcName(ex.rootPc, flat) + ' ' + FB_QUALITY_NAMES[ex.quality] + ' triads';
+    var ariaTitle = CT.pcName(ex.rootPc, flat) + ' ' + FB_QUALITY_NAMES[ex.quality] + ' triads' +
+      (scaleId ? ' with ' + TR.SCALES[scaleId].name + ' overlay' : '');
     var neck = '<div class="fb-wrap">' + FB.renderNeckSVG({
       fretCount: maxFret, dots: dots, windows: windows, ariaLabel: ariaTitle
     }) + '</div>';
@@ -1672,6 +1781,9 @@
         var fbQual = actEl.getAttribute('data-quality');
         if (fbRoot) ex0.rootPc = ((parseInt(fbRoot, 10) % 12) + 12) % 12;
         if (fbQual) ex0.quality = fbQual;
+        var fbScale = actEl.getAttribute('data-scale');
+        if (fbScale) ex0.scale = fbScale;
+        if (fbRoot) ex0.spell = actEl.getAttribute('data-spell') || 'auto';
         st.view = 'fretboard';
         st.perform = null;
         st.sidebarOpen = false;   // close the mobile drawer
@@ -1705,6 +1817,10 @@
         break;
       case 'fb-labels':
         getExplorer().labels = actEl.getAttribute('data-v');
+        updateExplorer();
+        break;
+      case 'fb-scale':
+        getExplorer().scale = actEl.getAttribute('data-v');
         updateExplorer();
         break;
       case 'fb-caged':

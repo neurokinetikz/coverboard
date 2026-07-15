@@ -912,9 +912,14 @@ function deepEq(a, b, name) {
          [['G', 0], ['E', 3], ['D', 5], ['C', 7], ['A', 10]], 'key G frames');
   eq(posG[1].index, 2, 'positions carry 1-based ordinals');
   deepEq(posC[4].windows, [[0, 2], [10, 14]], 'key C D-shape wraps below the nut');
+  // pattern letters are always major shape names; minor keys use relative-
+  // major frames (Am's G·5fr window = box-1 minor pentatonic)
   deepEq(T.positionsForKey(9, true).map(function (p) { return [p.shape, p.frame]; }),
          posC.map(function (p) { return [p.shape, p.frame]; }),
-         'Am uses relative-major (C) frames');
+         'Am uses the relative major (C) patterns');
+  deepEq(T.positionsForKey(2, true).map(function (p) { return [p.shape, p.frame]; }),
+         [['E', 1], ['D', 3], ['C', 5], ['A', 8], ['G', 10]],
+         'Dm patterns = F major patterns');
   deepEq(T.assignPositions([X, X, 2, 0, 1, X], posC), ['C', 'D'],
          'assignment includes wrap-around membership');
   deepEq(T.assignPositions([X, X, X, 5, 5, 3], posG), ['E'], 'C@5fr sits in E position of G');
@@ -979,6 +984,85 @@ function deepEq(a, b, name) {
   var fmFull = T.fretboardMap(0, 'maj');
   deepEq(fmFull.strings[1].filter(function (n) { return n.role === 'R'; })
            .map(function (n) { return n.fret; }), [3, 15], 'roots on A string');
+
+  // --- scales ---
+  deepEq(T.SCALES.majPent.intervals, [0, 2, 4, 7, 9], 'major pentatonic intervals');
+  deepEq(T.SCALES.minPent.intervals, [0, 3, 5, 7, 10], 'minor pentatonic intervals');
+  deepEq(T.SCALES.major.intervals, [0, 2, 4, 5, 7, 9, 11], 'major scale intervals');
+  deepEq(T.SCALES.minor.intervals, [0, 2, 3, 5, 7, 8, 10], 'natural minor intervals');
+  deepEq(T.SCALES.mixo.intervals, [0, 2, 4, 5, 7, 9, 10], 'Mixolydian intervals');
+  deepEq(T.SCALES.dorian.intervals, [0, 2, 3, 5, 7, 9, 10], 'Dorian intervals');
+
+  var amp = T.scaleMap(9, 'minPent');
+  deepEq(amp.strings[5].map(function (n) { return n.fret; }),
+         [0, 3, 5, 8, 10, 12, 15], 'Am pent on high e');
+  deepEq(amp.strings[5].map(function (n) { return n.role; }),
+         ['5', 'b7', 'R', 'b3', '4', '5', 'b7'], 'Am pent roles on high e');
+  deepEq(amp.strings[1].map(function (n) { return [n.fret, n.role]; }),
+         [[0, 'R'], [3, 'b3'], [5, '4'], [7, '5'], [10, 'b7'], [12, 'R'], [15, 'b3']],
+         'Am pent box-1 string (A)');
+  eq(amp.strings[1][0].midi, 45, 'scaleMap midi coherence');
+
+  // relative identity: A minor pent === C major pent, note for note
+  function pcSet(map) {
+    var s = {};
+    map.strings.forEach(function (arr) { arr.forEach(function (n) { s[n.pc] = 1; }); });
+    return Object.keys(s).sort().join(',');
+  }
+  eq(pcSet(amp), pcSet(T.scaleMap(0, 'majPent')), 'Am pent pcs === C maj pent pcs');
+
+  deepEq(T.scaleMap(0, 'major', { maxFret: 5 }).strings[5]
+           .map(function (n) { return [n.fret, n.role]; }),
+         [[0, '3'], [1, '4'], [3, '5'], [5, '6']], 'C major scale to fret 5 on high e');
+  eq(T.scaleMap(0, 'nope').strings.filter(function (a) { return a.length === 0; }).length, 6,
+     'unknown scale id -> empty strings');
+
+  eq(T.scaleForQuality('m7', 'pent'), 'minPent', 'm7 -> minor pent');
+  eq(T.scaleForQuality('maj', 'full'), 'major', 'maj -> major scale');
+  eq(T.scaleForQuality('7', 'full'), 'mixo', 'dominant 7 -> Mixolydian');
+  eq(T.scaleForQuality('m6', 'full'), 'dorian', 'm6 -> Dorian');
+  eq(T.scaleForQuality('min', 'full'), 'minor', 'min -> natural minor');
+  eq(T.scaleForQuality('dim', 'pent'), null, 'dim gated off');
+  eq(T.scaleForQuality('sus4', 'full'), null, 'sus gated off');
+
+  // pentatonic PATTERN boxes: every shape's box holds exactly 2 notes per
+  // string, in every key (the defining property of a box)
+  deepEq(T.PENT_BOX_SPAN, { C: [0, 3], A: [-1, 2], G: [0, 3], E: [-1, 2], D: [-1, 3] },
+         'pattern-box spans');
+  var boxFail = null;
+  for (var kpc = 0; kpc < 12; kpc++) {
+    var pmap = T.scaleMap(kpc, 'majPent', { maxFret: 22 });
+    T.positionsForKey(kpc, false, { maxFret: 22 }).forEach(function (p) {
+      var span = T.PENT_BOX_SPAN[p.shape];
+      var lo = p.frame + span[0], hi = p.frame + span[1];
+      if (lo < 0) return; // open-wrap edge; clamped in the UI
+      pmap.strings.forEach(function (arr, s) {
+        var n = arr.filter(function (x) { return x.fret >= lo && x.fret <= hi; }).length;
+        if (n !== 2 && !boxFail) {
+          boxFail = 'key ' + kpc + ' ' + p.shape + '-shape [' + lo + ',' + hi + '] string ' + s + ' has ' + n;
+        }
+      });
+    });
+  }
+  ok(boxFail === null, 'every box has exactly 2 pent notes per string' + (boxFail ? ' — ' + boxFail : ''));
+  // the reported case: E major, A-shape at 7fr -> box is frets 6-9
+  var eA = T.positionsForKey(4, false).filter(function (p) { return p.shape === 'A'; })[0];
+  eq(eA.frame, 7, 'E major A-shape frame');
+  var boxA = T.pentBoxDots(4, false, eA);
+  deepEq([boxA.lo, boxA.hi], [6, 9], 'E maj A-shape pent box = frets 6-9');
+  eq(boxA.dots.length, 12, 'A-shape box: 2 notes per string');
+  // nut-straddling shapes fall back to the open pattern (2 per string, from 0)
+  var eE = T.positionsForKey(4, false).filter(function (p) { return p.shape === 'E'; })[0];
+  eq(eE.frame, 0, 'E major E-shape frame');
+  var boxE = T.pentBoxDots(4, false, eE);
+  deepEq([boxE.lo, boxE.hi], [0, 4], 'E-shape at nut -> open pattern box 0-4');
+  eq(boxE.dots.length, 12, 'open pattern: 2 notes per string');
+  [0, 1, 2, 3, 4, 5].forEach(function (s) {
+    eq(boxE.dots.filter(function (d) { return d.string === s; }).length, 2,
+       'open pattern string ' + s + ' has 2 notes');
+  });
+  deepEq(boxE.dots.filter(function (d) { return d.string === 1; })
+           .map(function (d) { return d.fret; }), [2, 4], 'A string open pattern = frets 2,4');
 })();
 
 /* ============ diagrams: interval-role coloring ============ */
@@ -1015,6 +1099,27 @@ function deepEq(a, b, name) {
   var plain = DG.renderChordSVG(V.getVoicings('F', 1)[0], { label: 'F' });
   ok(plain.indexOf('cd-r') === -1 && plain.indexOf('cd-barre') !== -1,
      'plain charts unchanged (barre + no role classes)');
+
+  // vertical scale-box chart (multi-dot-per-string, chord-diagram idiom)
+  var box = DG.renderScaleSVG({
+    startFret: 5, endFret: 9,
+    dots: [
+      { string: 1, fret: 5, role: 'R' },
+      { string: 1, fret: 7, role: '5', ghost: true },
+      { string: 1, fret: 12, role: 'R' },      // outside window — dropped
+      { string: 2, fret: 0, role: '4', ghost: true }  // open — dropped when startFret>0
+    ]
+  });
+  ok(box.indexOf('<svg') === 0 && box.indexOf('chord-svg') !== -1, 'scale box renders in chart idiom');
+  ok(box.indexOf('5fr') !== -1, 'scale box shows base fret');
+  ok(box.indexOf('cd-nut') === -1, 'no nut above the nut');
+  eq((box.match(/cd-dot/g) || []).length, 2, 'window + open filtering');
+  ok(box.indexOf('cd-ghost') !== -1, 'ghost dots in scale box');
+  ok(box.indexOf('NaN') === -1, 'no NaN in scale box');
+  var openBox = DG.renderScaleSVG({ startFret: 0,
+    dots: [{ string: 5, fret: 0, role: 'R' }, { string: 5, fret: 3, role: '5', ghost: true }] });
+  ok(openBox.indexOf('cd-nut') !== -1, 'open-position scale box has the nut');
+  eq((openBox.match(/cd-dot/g) || []).length, 2, 'open dot kept at start 0');
 })();
 
 /* ============ fretboard renderer ============ */
@@ -1046,6 +1151,41 @@ function deepEq(a, b, name) {
   var svg2 = FB.renderNeckSVG({ dots: [], windows: [{ from: 0, to: 4 }], fretCount: 12 });
   ok((svg2.match(/fb-inlay/g) || []).length === 6, '12-fret neck: 4 singles + double at 12');
   ok(svg2.indexOf('NaN') === -1, 'no NaN with empty dots');
+
+  // --- windowed view (startFret) ---
+  var svg3 = FB.renderNeckSVG({
+    startFret: 5, fretCount: 10, width: 500, height: 110, showStringNames: false,
+    dots: [
+      { string: 2, fret: 6, role: 'R' },     // in window
+      { string: 2, fret: 4, role: '3' },     // below window — dropped
+      { string: 2, fret: 0, role: '5' }      // open — dropped in high windows
+    ],
+    windows: [{ from: 3, to: 9 }]
+  });
+  // padL=10, gridW=480, fw=96 -> fret 6 dot centered at 10 + 0.5*96 = 58
+  ok(svg3.indexOf('cx="58"') !== -1, 'windowed dot positioned relative to startFret');
+  eq((svg3.match(/fb-dot /g) || []).length, 1, 'out-of-window and open dots dropped');
+  ok(svg3.indexOf('fb-nut') === -1, 'no nut above the nut');
+  ok(svg3.indexOf('>7<') !== -1 && svg3.indexOf('>9<') !== -1, 'absolute fret numbers kept');
+  ok(svg3.indexOf('>3<') === -1 && svg3.indexOf('>12<') === -1, 'out-of-window numbers dropped');
+  ok(svg3.indexOf('x="-') === -1, 'window rect clamped to grid (no negative x)');
+  ok(svg3.indexOf('NaN') === -1, 'no NaN in windowed view');
+  ok(svg3.indexOf('fb-stringname') === -1, 'string names suppressed');
+
+  // ghosts: small, never labeled
+  var svg4 = FB.renderNeckSVG({
+    dots: [
+      { string: 1, fret: 5, role: '2', ghost: true, label: 'SHOULDNOTRENDER' },
+      { string: 1, fret: 7, role: 'R', label: 'A' }
+    ], fretCount: 12
+  });
+  ok(svg4.indexOf('fb-ghost') !== -1, 'ghost class emitted');
+  ok(svg4.indexOf('SHOULDNOTRENDER') === -1, 'ghost labels suppressed');
+  var radii = (svg4.match(/r="([\d.]+)"/g) || []).map(function (m) {
+    return parseFloat(m.slice(3, -1));
+  }).filter(function (x) { return x > 4; });  // ignore inlay r=4
+  ok(radii.length === 2 && Math.min.apply(null, radii) < Math.max.apply(null, radii),
+     'ghost radius smaller than normal dot');
 })();
 
 /* ============ report ============ */

@@ -60,6 +60,71 @@
     m6: { 0: 'R', 3: 'b3', 9: '6' }
   };
 
+  /* ---------- scales (reference layer for the explorer / strip card) ---------- */
+
+  var SCALES = {
+    majPent: { intervals: [0, 2, 4, 7, 9], name: 'major pentatonic',
+               roles: { 0: 'R', 2: '2', 4: '3', 7: '5', 9: '6' } },
+    minPent: { intervals: [0, 3, 5, 7, 10], name: 'minor pentatonic',
+               roles: { 0: 'R', 3: 'b3', 5: '4', 7: '5', 10: 'b7' } },
+    major:   { intervals: [0, 2, 4, 5, 7, 9, 11], name: 'major scale',
+               roles: { 0: 'R', 2: '2', 4: '3', 5: '4', 7: '5', 9: '6', 11: '7' } },
+    minor:   { intervals: [0, 2, 3, 5, 7, 8, 10], name: 'natural minor',
+               roles: { 0: 'R', 2: '2', 3: 'b3', 5: '4', 7: '5', 8: 'b6', 10: 'b7' } },
+    mixo:    { intervals: [0, 2, 4, 5, 7, 9, 10], name: 'Mixolydian',
+               roles: { 0: 'R', 2: '2', 4: '3', 5: '4', 7: '5', 9: '6', 10: 'b7' } },
+    dorian:  { intervals: [0, 2, 3, 5, 7, 9, 10], name: 'Dorian',
+               roles: { 0: 'R', 2: '2', 3: 'b3', 5: '4', 7: '5', 9: '6', 10: 'b7' } }
+  };
+
+  /* pentatonic PATTERN box per CAGED shape, relative to the shape's frame —
+     patterns don't align with chord windows uniformly: A/E/D-shape boxes
+     reach one fret below the frame. Each box holds exactly 2 notes per
+     string (the defining property; pinned by tests). */
+  var PENT_BOX_SPAN = { C: [0, 3], A: [-1, 2], G: [0, 3], E: [-1, 2], D: [-1, 3] };
+
+  /* the pentatonic pattern box for a CAGED position: the per-shape span
+     around the frame — except when that span would dip below the nut, where
+     the playable equivalent is the OPEN pattern: each string's two lowest
+     in-scale frets. Always yields exactly 2 notes per string. */
+  function pentBoxDots(rootPc, minor, position) {
+    var map = scaleMap(rootPc, minor ? 'minPent' : 'majPent', { maxFret: 17 });
+    var span = PENT_BOX_SPAN[position.shape] || [0, 4];
+    var lo = position.frame + span[0], hi = position.frame + span[1];
+    var dots = [];
+    if (lo < 0) {
+      lo = 0; hi = 0;
+      map.strings.forEach(function (arr, s) {
+        arr.slice(0, 2).forEach(function (n) {
+          dots.push({ string: s, fret: n.fret, interval: n.interval, role: n.role });
+          if (n.fret > hi) hi = n.fret;
+        });
+      });
+    } else {
+      map.strings.forEach(function (arr, s) {
+        arr.forEach(function (n) {
+          if (n.fret >= lo && n.fret <= hi) {
+            dots.push({ string: s, fret: n.fret, interval: n.interval, role: n.role });
+          }
+        });
+      });
+    }
+    return { lo: lo, hi: hi, dots: dots };
+  }
+
+  /* which scale fits a chord quality — chord-correct, not key-approximate:
+     dominant 7ths get Mixolydian, m6 gets Dorian */
+  function scaleForQuality(quality, kind) {
+    var minorish = quality === 'min' || quality === 'm7' || quality === 'm6';
+    var majorish = quality === 'maj' || quality === '7' ||
+                   quality === 'maj7' || quality === '6';
+    if (!minorish && !majorish) return null;
+    if (kind !== 'full') return minorish ? 'minPent' : 'majPent';
+    if (quality === '7') return 'mixo';
+    if (quality === 'm6') return 'dorian';
+    return minorish ? 'minor' : 'major';
+  }
+
   /* ---------- triad reduction ---------- */
 
   /* Reduce any parsed chord (or symbol) to its underlying triad.
@@ -227,8 +292,11 @@
   }
 
   /* The five CAGED positions for a key, sorted low to high (index 1..5).
-     Minor keys use relative-major frames: CAGED letters name major grips and
-     the neck regions are identical for a key and its relative minor. */
+     Pattern letters are ALWAYS the major shape names (user's model, and the
+     standard CAGED-for-scales convention): minor keys use the relative
+     major's frames and letters — the ROOTS you track inside the pattern are
+     what make it minor. An Am song's C·Open window is the C-shape pattern
+     with A roots; its G·5fr window is box-1 minor pentatonic. */
   function positionsForKey(keyPc, minor, opts) {
     opts = opts || {};
     var maxFret = opts.maxFret || 15;
@@ -475,11 +543,7 @@
 
   /* ---------- full-neck map (explorer dot cloud) ---------- */
 
-  function fretboardMap(rootPc, quality, opts) {
-    opts = opts || {};
-    var maxFret = opts.maxFret || 15;
-    rootPc = ((rootPc % 12) + 12) % 12;
-    var intervals = TRIAD_INTERVALS[quality] || [];
+  function mapIntervals(rootPc, intervals, roles, maxFret) {
     var strings = [];
     for (var s = 0; s < 6; s++) {
       var arr = [];
@@ -488,13 +552,33 @@
         var iv = ((pc - rootPc) % 12 + 12) % 12;
         if (intervals.indexOf(iv) !== -1) {
           arr.push({ fret: f, pc: pc, midi: OPEN_MIDI[s] + f, interval: iv,
-                     role: ROLE_NAMES[quality][iv] || '' });
+                     role: roles[iv] || '' });
         }
       }
       strings.push(arr);
     }
-    return { rootPc: rootPc, quality: quality, maxFret: maxFret,
-             tuning: V.TUNING, strings: strings };
+    return strings;
+  }
+
+  function fretboardMap(rootPc, quality, opts) {
+    opts = opts || {};
+    var maxFret = opts.maxFret || 15;
+    rootPc = ((rootPc % 12) + 12) % 12;
+    return { rootPc: rootPc, quality: quality, maxFret: maxFret, tuning: V.TUNING,
+             strings: mapIntervals(rootPc, TRIAD_INTERVALS[quality] || [],
+                                   ROLE_NAMES[quality] || {}, maxFret) };
+  }
+
+  /* scale-tone map, same shape as fretboardMap — the explorer's ghost layer
+     and the strip's pentatonic card both read this */
+  function scaleMap(rootPc, scaleId, opts) {
+    opts = opts || {};
+    var maxFret = opts.maxFret || 15;
+    rootPc = ((rootPc % 12) + 12) % 12;
+    var sc = SCALES[scaleId];
+    return { rootPc: rootPc, scaleId: scaleId, maxFret: maxFret, tuning: V.TUNING,
+             strings: mapIntervals(rootPc, sc ? sc.intervals : [],
+                                   sc ? sc.roles : {}, maxFret) };
   }
 
   var api = {
@@ -509,7 +593,12 @@
     voicingAtPosition: voicingAtPosition,
     voicingAnywhere: voicingAnywhere,
     songTriads: songTriads,
-    fretboardMap: fretboardMap
+    fretboardMap: fretboardMap,
+    SCALES: SCALES,
+    PENT_BOX_SPAN: PENT_BOX_SPAN,
+    pentBoxDots: pentBoxDots,
+    scaleMap: scaleMap,
+    scaleForQuality: scaleForQuality
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

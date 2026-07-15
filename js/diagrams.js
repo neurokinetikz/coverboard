@@ -158,7 +158,84 @@
     return out.join('');
   }
 
-  var api = { renderChordSVG: renderChordSVG };
+  /* vertical scale-box chart in the same idiom as the chord diagrams —
+     multiple dots per string, for pentatonic/scale windows.
+     opts: { startFret (absolute; 0 = open position), endFret (default +4),
+             dots: [{string 0..5 low-E first, fret, role, ghost}],
+             width, height, ariaLabel } */
+  function renderScaleSVG(opts) {
+    opts = opts || {};
+    var W = opts.width || 82;
+    var H = opts.height || 102;
+    var startFret = opts.startFret || 0;
+    var endFret = opts.endFret != null ? opts.endFret : startFret + 4;
+    var dots = opts.dots || [];
+    var label = opts.label || '';
+
+    var base = Math.max(1, startFret);      // first fret ROW shown
+    var nFrets = Math.max(1, endFret - base + 1);
+    var hasOpenRow = startFret === 0;       // open-string dots above the nut
+    var nStrings = 6;
+
+    var padTop = label ? 15 : 4;            // same name slot as chord charts
+    var markerRow = hasOpenRow ? 9 : 2;
+    var gridTop = padTop + markerRow;
+    var padLeft = 13, padRight = base > 1 ? 20 : 8;
+    var gridW = W - padLeft - padRight;
+    var gridH = H - gridTop - 8;
+    var sx = gridW / (nStrings - 1);
+    var fy = gridH / nFrets;
+    var sxDot = (W - padLeft - 8) / (nStrings - 1);
+    var dotR = Math.min(sxDot, fy) * 0.36;
+
+    function X(s) { return padLeft + s * sx; }
+    function fretY(f) { return gridTop + f * fy; }
+    function dotY(fretNum) { return gridTop + (fretNum - base + 0.5) * fy; }
+
+    var out = [];
+    out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H +
+             '" width="' + W + '" height="' + H + '" class="chord-svg" role="img" aria-label="' +
+             esc(opts.ariaLabel || 'scale box') + '">');
+
+    if (label) {
+      out.push('<text x="' + (W / 2) + '" y="11" text-anchor="middle" class="cd-name" ' +
+               'font-size="11.5" font-weight="600">' + esc(label) + '</text>');
+    }
+
+    if (base === 1) {
+      out.push('<rect x="' + (padLeft - 1) + '" y="' + (gridTop - 2.4) + '" width="' + (gridW + 2) +
+               '" height="2.8" rx="1" class="cd-nut"/>');
+    } else {
+      out.push('<text x="' + (W - padRight + 4) + '" y="' + (gridTop + fy * 0.65) +
+               '" font-size="8.5" class="cd-basefret">' + base + 'fr</text>');
+    }
+    for (var f = 0; f <= nFrets; f++) {
+      out.push('<line x1="' + padLeft + '" y1="' + fretY(f) + '" x2="' + (padLeft + gridW) +
+               '" y2="' + fretY(f) + '" class="cd-fret" stroke-width="0.8"/>');
+    }
+    for (var s = 0; s < nStrings; s++) {
+      out.push('<line x1="' + X(s) + '" y1="' + gridTop + '" x2="' + X(s) +
+               '" y2="' + (gridTop + gridH) + '" class="cd-string" stroke-width="' +
+               (0.7 + (5 - s) * 0.08) + '"/>');
+    }
+
+    dots.forEach(function (d) {
+      if (d.string < 0 || d.string > 5) return;
+      if (d.fret !== 0 && (d.fret < base || d.fret > endFret)) return;
+      if (d.fret === 0 && !hasOpenRow) return;
+      var cx = X(d.string);
+      var cy = d.fret === 0 ? gridTop - 5 : dotY(d.fret);
+      var cls = (ROLE_CLASS[d.role] || 'cd-3') + (d.ghost ? ' cd-ghost' : '');
+      var rr = d.ghost ? dotR * 0.62 : (d.fret === 0 ? 3.1 : dotR);
+      out.push('<g class="' + cls + '"><circle cx="' + cx + '" cy="' + cy +
+               '" r="' + rr + '" class="cd-dot"/></g>');
+    });
+
+    out.push('</svg>');
+    return out.join('');
+  }
+
+  var api = { renderChordSVG: renderChordSVG, renderScaleSVG: renderScaleSVG };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.Diagrams = api;
 })(typeof window !== 'undefined' ? window : globalThis);

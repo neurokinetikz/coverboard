@@ -484,6 +484,7 @@ pre.tabline {
 /* ---------- triad strip (song view) ---------- */
 
 .triad-strip {
+  position: relative;   /* the pentatonics zone anchors to the strip itself */
   padding: 10px 12px 8px; margin-bottom: 10px;
   background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;
 }
@@ -499,7 +500,7 @@ pre.tabline {
 }
 .pos-seg .mini, .ts-explore { font-size: 11.5px; padding: 3px 9px; border-radius: 6px; }
 .pos-seg .mini.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-.ts-explore { margin-left: auto; color: var(--accent); }
+.ts-explore { margin-left: 6px; color: var(--accent); }
 .ts-tiles {
   display: flex; gap: 6px; flex-wrap: nowrap; justify-content: center;
   align-items: flex-start; overflow-x: auto;
@@ -529,6 +530,40 @@ pre.tabline {
 }
 .triad-strip .dg { cursor: pointer; border-radius: 8px; padding: 2px; width: 100%; }
 .triad-strip .dg:hover { background: var(--bg-inset); }
+/* pentatonic-box card: anchored at the strip's right edge in its own zone —
+   "play this scale in this position" — while the chord tiles stay centered.
+   The reserved right padding keeps shrinking tiles from colliding with it. */
+.ts-tiles.has-scale,
+.diagram-strip.has-scale { padding-right: 306px; }
+.ts-tiles.has-scale { min-height: 180px; }
+.diagram-strip.has-scale { position: relative; min-height: 212px; }
+/* flush with the strip's top padding, level with the selector row */
+.ts-scale-zone {
+  position: absolute; right: 10px; top: 10px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.ts-zone-head { display: flex; align-items: center; justify-content: center; }
+.ts-zone-cards { display: flex; gap: 8px; }
+.ts-scale {
+  width: 142px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  cursor: pointer; border-radius: 10px; padding: 5px 8px 6px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--bg-panel));
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+}
+/* the card matching the song's key stays highlighted */
+.ts-scale.active,
+.ts-scale:hover {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 13%, var(--bg-panel));
+}
+.ts-scale .ts-neck { width: 100%; }
+.ts-scale .chord-svg { width: 100%; height: auto; display: block; }
+.ts-scale .ts-cap { margin-top: -6px; }
+.ts-scale .ts-cap2 { font-size: 9px; opacity: 0.8; margin-top: 1px; }
+.chord-svg .cd-ghost circle { fill: var(--text-dim); }
+.chord-svg .cd-ghost { opacity: 0.45; }
 .triad-strip .chord-svg { width: 100%; height: auto; display: block; }
 .ts-legend {
   display: flex; gap: 9px; align-items: center;
@@ -580,6 +615,10 @@ html[data-theme="dark"]  { --fb-r: #4d8dff; --fb-3: #fbbf24; --fb-5: #4ade80; --
 .fb-dot.fb-r .fb-dot-label { fill: #ffffff; }
 html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
 .fb-svg .fb-dot.fb-dim { opacity: 0.22; }
+/* scale-layer ghosts: small, neutral, quieter than chord tones but clearly
+   above fb-dim's whisper */
+.fb-svg .fb-dot.fb-ghost circle { fill: var(--text-dim); }
+.fb-svg .fb-dot.fb-ghost { opacity: 0.45; }
 .fb-svg .fb-window {
   fill: color-mix(in srgb, var(--accent) 9%, transparent);
   stroke: color-mix(in srgb, var(--accent) 30%, transparent);
@@ -634,6 +673,8 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
   .fb-svg .fb-string, .fb-svg .fb-fret { stroke: #666; }
   .fb-svg .fb-fretnum, .fb-svg .fb-stringname { fill: #444; }
   .fb-svg .fb-window-label { stroke: #fff; }
+  .fb-svg .fb-dot.fb-ghost circle { fill: #888; }
+  .chord-svg .cd-ghost circle { fill: #888; }
   .toolbar { border: none; background: none; padding: 0 0 8px; }
   .song-scroll, .song-scroll.fit { overflow: visible; height: auto; }
   .song-scroll.fit .song-body {

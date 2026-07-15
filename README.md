@@ -72,9 +72,17 @@ buttons — tapping `F♯` vs `G♭` spells everything accordingly) and any qual
 (maj, min, 7, m7, maj7, 6, m6, dim, aug, sus2, sus4). You get:
 
 - every chord tone across 15 frets, labeled by **interval** (default) or note name
+- a **scale layer** (`none | pentatonic | full scale`) — scale tones as small ghost
+  dots behind the chord tones, so you see the triad-inside-the-box relationship;
+  chord-correct flavors (minor pent / major pent; Mixolydian for 7ths, Dorian for m6)
 - a **string set + inversion filter** that narrows the cloud to actual closed voicings
 - an optional **CAGED overlay** shading the five position windows
 - the discrete voicing charts below the neck — tap any to open substitutions
+
+And in the song view: pick a CAGED position in the triad strip and a compact
+**pentatonic-box card** appears at the end of the row — that exact five-fret
+window with the key's pentatonic dots, tonics in root-blue. Tap it to open the
+explorer with everything pre-set.
 
 ## Learn: chord substitutions
 
