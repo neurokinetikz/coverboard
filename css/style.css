@@ -268,6 +268,9 @@ input[type="range"] { accent-color: var(--accent); }
 .song-scroll.fit .section-head { break-after: avoid; }
 .song-scroll.fit .line, .song-scroll.fit pre.tabline { break-inside: avoid; }
 .song-scroll.fit .diagram-strip { column-span: all; margin-bottom: 8px; padding: 6px 8px 2px; }
+/* keep the pentatonics zone's reserved width in fit mode (this three-class
+   fit rule otherwise out-specifies .diagram-strip.has-scale) */
+.song-scroll.fit .diagram-strip.has-scale { padding-right: 306px; }
 .song-scroll.fit .diagram-strip .dg { flex-basis: 136px; }
 .song-scroll.fit .triad-strip { column-span: all; margin-bottom: 8px; padding: 6px 8px 4px; }
 .song-scroll.fit .triad-strip .ts-tile { flex-basis: 136px; }
