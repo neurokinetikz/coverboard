@@ -291,9 +291,10 @@
     });
     var extraLabel = has7 && has6 ? '7th·6th' : has7 ? '7th' : has6 ? '6th' : '';
     var out = ['<div class="triad-strip" id="triad-strip">'];
-    out.push('<div class="ts-head"><span class="ts-lab">Triads' +
-      (result.key ? ' · key' : '') + '</span>' +
-      (result.key ? '<span class="sub-key">' + esc(result.key.name) + '</span>' : '') +
+    out.push('<div class="ts-head">' +
+      (result.key
+        ? '<span class="ts-lab">Key</span><span class="sub-key">' + esc(result.key.name) + '</span>'
+        : '<span class="ts-lab">Triads</span>') +
       triadLegendHTML(extraLabel));
     if (result.key) {
       out.push('<span class="ts-sub">Position</span><span class="pos-seg">');
@@ -682,9 +683,10 @@
       '<div class="toolbar song-tb">' +
       '<div class="tb-left">' +
       '<button class="icon" data-act="toggle-sidebar" title="Library">☰</button>' +
+      '<span class="tb-key-lbl">Key</span>' +
       '<div class="tgroup keygrp" title="Key — click to change">' +
         '<button data-act="transpose" data-d="-1" title="Down a semitone">−</button>' +
-        '<button class="key-chip" data-act="key-menu">Key ' + keyLabel + '</button>' +
+        '<button class="key-chip" data-act="key-menu">' + keyLabel + '</button>' +
         '<button data-act="transpose" data-d="1" title="Up a semitone">＋</button>' +
         (tr ? '<button data-act="transpose" data-d="0" title="Reset to original key">⟲</button>' : '') +
       '</div>' +

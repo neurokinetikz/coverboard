@@ -199,15 +199,20 @@ input[type="range"] { accent-color: var(--accent); }
 }
 .tgroup { display: flex; align-items: center; gap: 3px; background: var(--bg-inset); border-radius: 8px; padding: 2px; }
 .tgroup.keygrp { border: 1.5px solid color-mix(in srgb, var(--accent) 70%, transparent); }
+.tb-key-lbl {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--text-dim); margin: 0 0 0 4px;
+}
 .key-chip {
-  background: color-mix(in srgb, var(--accent) 24%, var(--bg-inset)) !important;
+  /* primary weight, like the Fit/Chords/Triads buttons */
+  background: var(--accent) !important;
   border: none; border-radius: 6px !important;
   font-size: 13px; font-weight: 700; padding: 5px 11px !important;
-  color: var(--text);
+  color: var(--accent-text);
   /* mixed font sizes inside — flex-center them instead of baseline-aligning */
   display: inline-flex; align-items: center; gap: 5px;
 }
-.key-chip .kx { color: var(--accent); font-size: 17px; line-height: 1; }
+.key-chip .kx { color: var(--accent-text); font-size: 17px; line-height: 1; }
 /* capo: its own chip beside the key group — same accent family, clearly
    separate from the transpose controls */
 .capo-chip {
@@ -218,7 +223,10 @@ input[type="range"] { accent-color: var(--accent); }
   border-radius: 8px; padding: 6px 11px;
 }
 .capo-chip b { color: var(--accent); font-size: 15px; line-height: 1; }
-.key-chip .was { color: var(--text-dim); font-weight: 500; font-size: 11.5px; }
+.key-chip .was {
+  color: color-mix(in srgb, var(--accent-text) 75%, transparent);
+  font-weight: 500; font-size: 11.5px;
+}
 .key-chip:hover { filter: brightness(1.12); }
 
 .key-menu {
@@ -422,7 +430,11 @@ pre.tabline {
   color: var(--text-dim); margin: 12px 0 6px;
 }
 .sub-note { font-size: 11px; color: var(--text-dim); text-align: center; padding-top: 4px; }
-.sub-key { font-size: 14.5px; font-weight: 700; color: var(--accent); margin-left: 2px; }
+.sub-key {
+  font-size: 14.5px; font-weight: 700; color: var(--accent); margin-left: 2px;
+  /* light pill so the key value stands apart from the dim "KEY" label */
+  background: var(--bg-inset); padding: 2px 9px; border-radius: 7px;
+}
 .sub-items { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .sub-item {
   display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px;
@@ -568,6 +580,7 @@ pre.tabline {
 .ts-legend {
   display: flex; gap: 9px; align-items: center;
   font-size: 10.5px; color: var(--text-dim);
+  margin-left: 16px;   /* breathing room after TRIADS · KEY */
 }
 .ts-legend span { display: flex; align-items: center; gap: 3px; }
 .ts-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
