@@ -1,0 +1,28 @@
+{title: Paper Lanterns}
+{artist: The Placeholder Band}
+{key: G}
+{capo: 2}
+{x_custom: foo}
+
+{c: Gently, with a swing feel}
+
+{sov}
+He[G]llo from the [C]rooftop tonight
+Wan[Em]dering down where the lam[D]plight bends
+Chords at the line end[Am]
+{eov}
+
+{soc}
+[C] [G] [Am] [D]
+We [C]sing till the [G]morning comes a[D]round
+{eoc}
+
+{start_of_verse}
+Mid[G]word an[C]chors keep the ti[D]ming tight
+{end_of_verse}
+
+{start_of_chorus}
+One more [C]time around the [G]bend
+{end_of_chorus}
+
+{c: repeat and fade}

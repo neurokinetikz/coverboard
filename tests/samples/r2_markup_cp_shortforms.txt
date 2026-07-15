@@ -1,0 +1,11 @@
+{t: Paper Lanterns}
+{st: The Orchard Line}
+{capo:0}
+{key: F#m}
+{  soc  :  Final Chorus  }
+Lift [F#m]every lantern [A]high
+Let the [D]cold wind pass us [C#7]by
+{end_of_chorus}
+[spoken] hold the last note
+Sing it round again [x3]
+[fade out]

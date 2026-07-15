@@ -1,0 +1,8 @@
+# personal song library (file-sync target — contains pasted lyrics)
+songbook-library.json
+
+# build output (regenerate with: node build.js)
+dist/
+
+.DS_Store
+node_modules/

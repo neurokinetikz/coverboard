@@ -1,0 +1,14 @@
+Edge Case Collector
+by The Placeholder Union
+
+[Verse 1]
+Amadd11    Am(add11)    Amadd9
+Minor add-eleven chords should stay minor here
+C7(b9)     Am(maj7)     E7(#9)
+Closing parens should survive the trip
+
+[Chorus]
+C    G    Am    Gx3
+Attached repeat marks ride along the line
+N.C.
+Unaccompanied words beneath a stop

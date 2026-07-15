@@ -1,0 +1,20 @@
+{title: Edge Cases}
+{capo}
+{capo: 3}
+{x_custom: foo}
+{comment-italic: softly now}
+# just a source note
+
+{sov}
+[C]verse la la
+{eov}
+
+{start_of_bridge}
+[F]bridge la [G]la
+{end_of_bridge}
+
+{soc}
+[C]shine on placeholder
+{eoc}
+
+{chorus}

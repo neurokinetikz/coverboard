@@ -1,0 +1,2 @@
+[tab]G       C[/tab][tab]Hello out there my friend[/tab]
+[tab]e|--0--2--3--|[/tab][tab]B|--1--3--5--|[/tab]

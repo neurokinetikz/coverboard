@@ -1,0 +1,3 @@
+[Verse]
+Am        F
+Zero column start of line
