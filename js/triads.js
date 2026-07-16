@@ -350,6 +350,30 @@
     return fr.length ? sum / fr.length : 0;
   }
 
+  /* Voice-leading distance primitives ("near" mode). Total pitch of a voicing
+     encodes both movements at once: one fret along the neck is one semitone
+     per voice, crossing to the adjacent string set ~4.7 per voice. Integer by
+     construction (sum, not mean) — real chains hit exact ties that must fall
+     to the deterministic tie-breaks, not float noise. */
+  function sumMidi(v) {
+    var frets = v && v.frets ? v.frets : v, sum = 0;
+    for (var s = 0; s < 6; s++) {
+      if (frets[s] >= 0) sum += OPEN_MIDI[s] + frets[s];
+    }
+    return sum;
+  }
+
+  /* Held common tones: same string, same fret — the fingers that don't move. */
+  function commonPairs(v, a) {
+    var vf = v && v.frets ? v.frets : v;
+    var af = a && a.frets ? a.frets : a;
+    var n = 0;
+    for (var s = 0; s < 6; s++) {
+      if (vf[s] >= 0 && vf[s] === af[s]) n++;
+    }
+    return n;
+  }
+
   /* Pick the best triad voicing for a chord inside a CAGED position.
      Ladder: strict in-window, then widened ±1, ±2 (preferred string set gets
      the whole ladder first), then globally nearest (outOfPosition).
@@ -361,7 +385,11 @@
     var maxFret = opts.maxFret || 15;
     var all = triadsFor(rootPc, quality, { maxFret: maxFret });
     if (!all.length) return null;
-    var pref = opts.stringSetPref || null;
+    var anchor = opts.anchor || null;
+    // unknown ids (e.g. the app-level 'near' mode marker) must not reach
+    // SET_INDEX — a NaN score silently scrambles the sort
+    var pref = !anchor && opts.stringSetPref &&
+      SET_INDEX.hasOwnProperty(opts.stringSetPref) ? opts.stringSetPref : null;
 
     function widen(extra) {
       return position.windows.map(function (w) {
@@ -391,14 +419,20 @@
     var center = position.frame != null
       ? position.frame + 2
       : (position.window[0] + position.window[1]) / 2;
+    var anchorSum = anchor ? sumMidi(anchor) : 0;
     function score(v) {
       var s = 0;
+      if (opts.bassPc != null && v.bassPc === opts.bassPc) s += 30;
+      if (anchor) {
+        // voice-leading: closest total pitch wins, but a finger that stays
+        // put is worth ~3 semitones of drift per voice
+        return s + 9 * commonPairs(v, anchor) - Math.abs(sumMidi(v) - anchorSum);
+      }
       if (pref) {
         s += v.stringSet === pref
           ? 200
           : -5 * Math.abs(SET_INDEX[v.stringSet] - SET_INDEX[pref]);
       }
-      if (opts.bassPc != null && v.bassPc === opts.bassPc) s += 30;
       s -= 2 * Math.abs(centroid(v) - center);
       return s;
     }
@@ -419,14 +453,26 @@
     opts = opts || {};
     var all = triadsFor(rootPc, quality, { maxFret: opts.maxFret || 15 });
     if (!all.length) return null;
-    var pref = opts.stringSetPref || '1-3';
+    var anchor = opts.anchor || null;
+    var near = !!opts.near || !!anchor;
+    var pref = !near && opts.stringSetPref &&
+      SET_INDEX.hasOwnProperty(opts.stringSetPref) ? opts.stringSetPref
+      : near ? null : '1-3';
+    var anchorSum = anchor ? sumMidi(anchor) : 0;
     function score(v) {
-      // set loyalty outweighs a few frets of position (an open-string grip on
-      // another set must not beat the preferred set's low voicing)
-      var s = v.stringSet === pref
-        ? 0
-        : -8 * Math.abs(SET_INDEX[v.stringSet] - SET_INDEX[pref]);
+      var s = 0;
       if (opts.bassPc != null && v.bassPc === opts.bassPc) s += 30;
+      if (anchor) {
+        // free-float voice leading: whole neck, no window ladder
+        return s + 9 * commonPairs(v, anchor) - Math.abs(sumMidi(v) - anchorSum);
+      }
+      if (pref) {
+        // set loyalty outweighs a few frets of position (an open-string grip on
+        // another set must not beat the preferred set's low voicing)
+        s += v.stringSet === pref
+          ? 0
+          : -8 * Math.abs(SET_INDEX[v.stringSet] - SET_INDEX[pref]);
+      }
       return s - 2 * v.minFret - 0.5 * v.inversion;
     }
     var cands = all.slice().sort(function (a, b) {
@@ -510,20 +556,35 @@
       });
     }
 
+    // 'near' is a mode, not a set id: voice-leading chain — each chord picks
+    // the voicing closest to the previous chord's, string set free to float
+    var near = opts.stringSetPref === 'near';
+    var basePref = near ? null : (opts.stringSetPref || null);
+    var prevBest = null;      // chain anchor ('any' and single-position paths)
+    var prevByShape = {};     // independent chain per shape (byPosition path)
+
     var chords = entries.map(function (e) {
       var t = reduceTriad(e.parsed);
       t.rootName = CT.pcName(t.rootPc, preferFlat);
       t.label = t.rootName + TRIAD_SUFFIX[t.quality];
-      var vOpts = { stringSetPref: opts.stringSetPref || null, maxFret: maxFret, bassPc: t.bassPc };
+      var vOpts = { stringSetPref: basePref, maxFret: maxFret, bassPc: t.bassPc };
       var entry = { sym: e.sym, triad: t };
       if (opts.position === 'any') {
+        if (near) { vOpts.near = true; vOpts.anchor = prevBest; }
         entry.atPosition = voicingAnywhere(t.rootPc, t.quality, vOpts);
+        if (near && entry.atPosition && entry.atPosition.best) prevBest = entry.atPosition.best;
       } else if (wanted) {
+        if (near && prevBest) vOpts.anchor = prevBest;
         entry.atPosition = voicingAtPosition(t.rootPc, t.quality, wanted, vOpts);
+        if (near && entry.atPosition && entry.atPosition.best) prevBest = entry.atPosition.best;
       } else {
         entry.byPosition = {};
         positions.forEach(function (p) {
-          entry.byPosition[p.shape] = voicingAtPosition(t.rootPc, t.quality, p, vOpts);
+          var po = { stringSetPref: basePref, maxFret: maxFret, bassPc: t.bassPc };
+          if (near && prevByShape[p.shape]) po.anchor = prevByShape[p.shape];
+          var pk = voicingAtPosition(t.rootPc, t.quality, p, po);
+          entry.byPosition[p.shape] = pk;
+          if (near && pk && pk.best) prevByShape[p.shape] = pk.best;
         });
       }
       if (opts.includeAllVoicings) {

@@ -181,18 +181,7 @@
   function diagramStripHTML(parsed, tr, flat, song) {
     if (!parsed.chords.length) return '';
     var settings = Store.getSettings();
-    // scale card for the chords strip: anchored to the key's LOWEST position
-    // (matches the mostly-open grips this strip shows)
-    var scaleKey = null, scaleLow = null;
-    if (TR && FB && song) {
-      scaleKey = effectiveKey(song, parsed);
-      if (!scaleKey) {
-        var dispSyms = parsed.chords.map(function (c) { return dispChord(c, tr, flat); });
-        scaleKey = CT.detectKey(dispSyms);
-      }
-      if (scaleKey) scaleLow = TR.positionsForKey(scaleKey.pc, scaleKey.minor)[0] || null;
-    }
-    var seen = {}, out = ['<div class="diagram-strip' + (scaleLow ? ' has-scale' : '') + '">'];
+    var seen = {}, out = ['<div class="diagram-strip">'];
     parsed.chords.forEach(function (sym) {
       var d = dispChord(sym, tr, flat);
       var p = CT.parseChord(d);
@@ -205,12 +194,6 @@
         '" title="' + esc(d) + ' — tap for substitutions">' +
         DG.renderChordSVG(voicings[0], { label: d, showFingers: settings.showFingers }) + '</span>');
     });
-    if (scaleLow && out.length > 1) {
-      var kf = CT.keyPrefersFlat(scaleKey.pc, scaleKey.minor);
-      out.push(scaleZoneHTML({ pc: scaleKey.pc, minor: scaleKey.minor,
-        name: scaleKey.name || (CT.pcName(scaleKey.pc, kf) + (scaleKey.minor ? 'm' : '')) },
-        scaleLow, kf));
-    }
     out.push('</div>');
     return out.length > 2 ? out.join('') : '';
   }
@@ -234,6 +217,13 @@
   }
 
   var TRIAD_SET_IDS = ['1-3', '2-4', '3-5', '4-6'];
+  // 'near' = voice-leading chain: each triad voiced closest to the previous
+  // chord's, string set free to float (the engine treats it as a mode)
+  var TRIAD_STRING_MODES = TRIAD_SET_IDS.concat(['near']);
+  function triadStringsPref() {
+    var v = Store.getSettings().triadStrings;
+    return TRIAD_STRING_MODES.indexOf(v) !== -1 ? v : '1-3';
+  }
 
   /* Per-string interval roles for a triad voicing -> diagrams.js opts.roles */
   function triadRoles(v) {
@@ -273,9 +263,9 @@
     var settings = Store.getSettings();
     var pos = String(settings.triadPos || 'any');
     // one string set per pass (triads-on-string-sets pedagogy); the engine
-    // falls to adjacent sets only when the chosen set has nothing in position
-    var setPref = TRIAD_SET_IDS.indexOf(settings.triadStrings) !== -1
-      ? settings.triadStrings : '1-3';
+    // falls to adjacent sets only when the chosen set has nothing in position.
+    // 'near' instead chains each triad closest to the previous chord's.
+    var setPref = triadStringsPref();
     var result = TR.songTriads(disp, {
       key: key || undefined,
       position: pos === 'any' ? 'any' : parseInt(pos, 10),
@@ -315,18 +305,19 @@
         '" data-act="triad-strings" data-v="' + id + '" title="Play triads on strings ' +
         id + '">' + id + '</button>');
     });
+    out.push('<button class="mini' + (setPref === 'near' ? ' active' : '') +
+      '" data-act="triad-strings" data-v="near" ' +
+      'title="Voice-leading chain: each triad closest to the previous chord’s">Near</button>');
     out.push('</span>');
-    var scalePos = null;
-    if (FB && result.key && pos !== 'any') {
-      scalePos = result.positions[parseInt(pos, 10) - 1] || null;
-    }
     if (result.key) {
       out.push('<button class="mini ts-explore" data-act="view-fretboard" data-root="' +
         result.key.pc + '" data-quality="' + (result.key.minor ? 'min' : 'maj') +
         '" data-scale="pent" data-spell="' + (result.preferFlat ? 'flat' : 'sharp') +
         '">Explore neck →</button>');
+      out.push('<button class="mini ts-explore" data-act="view-practice" ' +
+        'title="Step the song’s progression on the neck, one position at a time">▶ Practice</button>');
     }
-    out.push('</div><div class="ts-tiles' + (scalePos ? ' has-scale' : '') + '">');
+    out.push('</div><div class="ts-tiles">');
 
     // the origin-badge row costs a line above every chart — only render it
     // when some chord in the song was actually reduced
@@ -352,6 +343,8 @@
                  : pick.relaxed ? '<span class="ts-flag">±' + pick.relaxed + 'fr</span>' : '';
         // the Strings selector already says which set; call it out only when
         // the engine had to fall back to a different one
+        // the set prefix shows whenever the voicing left the chosen set —
+        // in Near mode ('near' matches no set id) that's every chart, by design
         var capTxt = (v.stringSet !== setPref ? v.stringSet + ' · ' : '') +
           triadInvName(v.inversion);
         out.push('<span class="ts-cap">' + esc(capTxt) + flag + '</span>');
@@ -359,11 +352,6 @@
       out.push('</span>');
     });
 
-    // scale zone: the key's pentatonic + its parallel flavor, anchored at
-    // the strip's right edge
-    if (scalePos) {
-      out.push(scaleZoneHTML(result.key, scalePos, result.preferFlat));
-    }
     out.push('</div></div>');
     return out.join('');
   }
@@ -383,42 +371,91 @@
       pc + '" data-quality="' + (minorFlavor ? 'min' : 'maj') +
       '" data-scale="pent" data-spell="' + (preferFlat ? 'flat' : 'sharp') +
       '" title="' + esc(title + ' pentatonic in this position — tap to explore') + '">' +
+      // no per-card name — the flavor is named once at the top of its column
       '<span class="ts-neck">' + DG.renderScaleSVG({
         startFret: box.lo, endFret: box.hi, dots: scDots,
-        label: title,
+        width: 104,
         ariaLabel: title + ' pentatonic, ' +
           (box.lo === 0 ? 'open position' : 'frets ' + box.lo + '-' + box.hi)
       }) + '</span>' +
-      '<span class="ts-cap">' + esc(position.shape + ' shape · ' +
-        (position.frame === 0 ? 'open' : position.frame + 'fr')) + '</span></span>';
+      // just the shape — the chart itself carries the fret tag
+      '<span class="ts-cap">' + esc(position.shape + ' shape') + '</span></span>';
   }
 
-  /* the strip's scale zone: header ("pentatonics" + neck link) over the
-     key's own pentatonic plus its PARALLEL flavor (the blues pairing), each
-     in its own true pattern box nearest the selected position */
-  function scaleZoneHTML(key, sp, preferFlat) {
+  /* The song's key for the scales column: explicit key, else detected from
+     the DEDUPED display chords (same list the triad strip detects from, so
+     both always agree — detectKey is frequency-weighted and diverges when
+     fed the raw repeat-laden list). */
+  function songScaleKey(song, parsed, tr, flat) {
+    var key = effectiveKey(song, parsed);
+    if (key) return key;
+    var seen = {}, uniq = [];
+    parsed.chords.forEach(function (sym) {
+      var d = dispChord(sym, tr, flat);
+      var p = CT.parseChord(d);
+      if (!p) return;
+      var k = p.rootPc + '|' + p.quality + '|' + p.bassPc;
+      if (!seen[k]) { seen[k] = 1; uniq.push(d); }
+    });
+    return uniq.length ? CT.detectKey(uniq) : null;
+  }
+
+  /* The scales column: all five CAGED positions, nut first, one row per
+     position — the key's own pentatonic plus its PARALLEL flavor (the blues
+     pairing), each in its own true pattern box nearest that neck region.
+     Pinned to the right of the lyrics; rows share the height equally. */
+  function scaleColHTML(song, parsed, tr, flat) {
+    if (!TR || !parsed.chords.length) return '';
+    var key = songScaleKey(song, parsed, tr, flat);
+    if (!key) return '';
+    var preferFlat = CT.keyPrefersFlat(key.pc, key.minor);
     var tonic = CT.pcName(key.pc, preferFlat);
     var primaryTitle = tonic + (key.minor ? 'm' : '');
     var parallelTitle = tonic + (key.minor ? '' : 'm');
+    var settings = Store.getSettings();
+    var selIndex = settings.showTriads && String(settings.triadPos || 'any') !== 'any'
+      ? parseInt(settings.triadPos, 10) : 0;
+    var positions = TR.positionsForKey(key.pc, key.minor);
+    var parPositions = TR.positionsForKey(key.pc, !key.minor);
 
-    // the parallel flavor's box nearest this neck region
-    var primaryBox = TR.pentBoxDots(key.pc, key.minor, sp);
-    var center = (primaryBox.lo + primaryBox.hi) / 2;
-    var parallelPos = null, bd = Infinity;
-    TR.positionsForKey(key.pc, !key.minor).forEach(function (p) {
-      var b = TR.pentBoxDots(key.pc, !key.minor, p);
-      var d = Math.abs((b.lo + b.hi) / 2 - center);
-      if (d < bd) { bd = d; parallelPos = p; }
-    });
-
-    return '<span class="ts-scale-zone">' +
-      '<span class="ts-zone-head"><span class="ts-lab">Pentatonics</span></span>' +
-      '<span class="ts-zone-cards">' +
-      scaleCardHTML(key.pc, key.minor, primaryTitle, sp, preferFlat, true) +
-      (parallelPos
+    // two flavor sub-columns (key's own + parallel), each named ONCE at the
+    // top; card rows align because both stacks share the same equal-flex rows
+    var prim = [], par = [];
+    positions.forEach(function (sp) {
+      prim.push(scaleCardHTML(key.pc, key.minor, primaryTitle, sp, preferFlat,
+        sp.index === selIndex));
+      // the parallel flavor's box nearest this row's neck region
+      var primaryBox = TR.pentBoxDots(key.pc, key.minor, sp);
+      var center = (primaryBox.lo + primaryBox.hi) / 2;
+      var parallelPos = null, bd = Infinity;
+      parPositions.forEach(function (p) {
+        var b = TR.pentBoxDots(key.pc, !key.minor, p);
+        var d = Math.abs((b.lo + b.hi) / 2 - center);
+        if (d < bd) { bd = d; parallelPos = p; }
+      });
+      par.push(parallelPos
         ? scaleCardHTML(key.pc, !key.minor, parallelTitle, parallelPos, preferFlat, false)
-        : '') +
-      '</span></span>';
+        : '<span class="ts-scale sc-blank"></span>');
+    });
+    return '<div class="scale-col" id="scale-col">' +
+      '<div class="ts-zone-head"><span class="ts-lab">Pentatonics</span></div>' +
+      '<div class="sc-names"><span class="sc-name">' + esc(primaryTitle) +
+        '</span><span class="sc-name">' + esc(parallelTitle) + '</span></div>' +
+      '<div class="sc-grid">' +
+      '<div class="sc-flavor">' + prim.join('') + '</div>' +
+      '<div class="sc-flavor">' + par.join('') + '</div>' +
+      '</div></div>';
+  }
+
+  /* Swap just the scales column (position highlight follows the strip). */
+  function updateScaleCol() {
+    var el = $('#scale-col');
+    var song = App.state.songId ? Store.getSong(App.state.songId) : null;
+    if (!el || !song) return;
+    var parsed = Store.parsedSong(song);
+    var tr = song.transpose || 0;
+    var flat = songPreferFlat(song, parsed, tr);
+    el.outerHTML = scaleColHTML(song, parsed, tr, flat);
   }
 
   /* Swap just the strip (keeps the song's scroll position mid-practice). */
@@ -429,6 +466,7 @@
     var parsed = Store.parsedSong(song);
     var tr = song.transpose || 0;
     var flat = songPreferFlat(song, parsed, tr);
+    updateScaleCol();   // position highlight in the scales column follows
     el.outerHTML = triadStripHTML(parsed, tr, flat, song);
     scheduleFit();
   }
@@ -560,7 +598,8 @@
     }
     rows.forEach(function (r) {
       var s = r.song;
-      var selCls = s.id === App.state.songId && App.state.view === 'song' ? ' sel' : '';
+      var selCls = s.id === App.state.songId &&
+        (App.state.view === 'song' || App.state.view === 'practice') ? ' sel' : '';
       if (grouped) {
         var g = s.artist || 'Unknown artist';
         var isCollapsed = !!collapsed[g];
@@ -628,6 +667,7 @@
     if (st.view === 'setlists') return setlistsHTML();
     if (st.view === 'setlist') return setlistDetailHTML();
     if (st.view === 'fretboard') return fretboardHTML();
+    if (st.view === 'practice') return practiceHTML();
     return songViewHTML();
   }
 
@@ -711,11 +751,17 @@
       '<button data-act="print" class="icon" title="Print">⎙</button>' +
       '<button data-act="delete-song" class="icon danger" title="Delete">🗑</button>' +
       '</div></div>' +
-      '<div class="song-scroll' + (fit ? ' fit' : '') + '" id="song-scroll"><div class="song-body">' +
+      // strip = full-width pinned header; below it lyrics + the scales
+      // column share the remaining height
       (settings.showTriads ? triadStripHTML(parsed, tr, flat, song)
         : settings.showDiagrams ? diagramStripHTML(parsed, tr, flat, song) : '') +
+      '<div class="song-cols">' +
+      '<div class="song-scroll' + (fit ? ' fit' : '') + '" id="song-scroll"><div class="song-body">' +
       sectionsHTML(parsed, { transpose: tr, preferFlat: flat }) +
-      '</div></div>';
+      '</div></div>' +
+      (settings.showTriads || settings.showDiagrams
+        ? scaleColHTML(song, parsed, tr, flat) : '') +
+      '</div>';
   }
 
   /* ---------- setlists ---------- */
@@ -984,6 +1030,218 @@
     else render();
   }
 
+  /* ---------- practice mode: step the progression through one position ----------
+     A separate view (the song view and its strips are untouched): the full
+     neck locked to the selected CAGED position, pentatonic box as ghosts,
+     the CURRENT chord's triad highlighted inside it, the NEXT chord's triad
+     faint — space bar walks the song's actual progression. */
+
+  function practiceCtx() {
+    var song = App.state.songId ? Store.getSong(App.state.songId) : null;
+    if (!song) return null;
+    var parsed = Store.parsedSong(song);
+    var tr = song.transpose || 0;
+    var flat = songPreferFlat(song, parsed, tr);
+    var seq = [], lastId = null, pendingSec = null;
+    var seen = {}, uniq = [];
+    parsed.sections.forEach(function (sec) {
+      if (sec.label) {
+        pendingSec = sec.label;
+        lastId = null;   // a section start is a real event even on the same chord
+      }
+      sec.lines.forEach(function (line) {
+        (line.chords || []).forEach(function (c) {
+          var d = dispChord(c.sym, tr, flat);
+          var p = CT.parseChord(d);
+          if (!p) return;
+          var id = p.rootPc + '|' + p.quality + '|' + p.bassPc;
+          if (!seen[id]) { seen[id] = 1; uniq.push(d); }
+          if (id === lastId) return;   // collapse immediate repeats
+          lastId = id;
+          seq.push({ sym: d, section: pendingSec });
+          pendingSec = null;
+        });
+      });
+    });
+    if (!seq.length) return null;
+    // detect on the deduped list, exactly like the strip (resolveKey), so the
+    // key here always matches the one the strip advertised next to ▶ Practice
+    var key = effectiveKey(song, parsed) || CT.detectKey(uniq);
+    if (!key) {
+      var fp = CT.parseChord(uniq[0]);
+      if (fp) {
+        var fMin = /^m(?!aj)/.test(fp.quality);
+        key = { pc: fp.rootPc, minor: fMin,
+                name: CT.pcName(fp.rootPc, CT.keyPrefersFlat(fp.rootPc, fMin)) + (fMin ? 'm' : '') };
+      }
+    }
+    if (!key) return null;
+    return { song: song, seq: seq, key: key };
+  }
+
+  function practiceStep(d) {
+    var pr = App.state.practice || (App.state.practice = { idx: 0 });
+    pr.idx += d;
+    updatePractice();
+  }
+
+  function practiceBodyHTML() {
+    var ctx = practiceCtx();
+    if (!ctx) {
+      return '<div class="empty-hint">This song needs parseable chords and a key to practice.</div>';
+    }
+    var settings = Store.getSettings();
+    var pos = String(settings.triadPos || 'any');
+    if (pos === 'any') pos = '1';
+    var setPref = triadStringsPref();
+    var positions = TR.positionsForKey(ctx.key.pc, ctx.key.minor);
+    var p = positions[parseInt(pos, 10) - 1] || positions[0];
+
+    var pr = App.state.practice || (App.state.practice = { idx: 0 });
+    var len = ctx.seq.length;
+    pr.idx = ((pr.idx % len) + len) % len;
+    var cur = ctx.seq[pr.idx];
+    var nxt = len > 1 ? ctx.seq[(pr.idx + 1) % len] : null;
+
+    // In Near mode the whole chain is rebuilt from step 0 every render so
+    // voicings[idx] never depends on HOW the user reached idx (rail jumps,
+    // back-steps, wraps all land on identical picks). triadsFor is cached —
+    // one filter+sort per link.
+    var chain = null;
+    if (setPref === 'near') {
+      chain = [];
+      var prevV = null;
+      for (var ci = 0; ci < len; ci++) {
+        var ct = TR.reduceTriad(ctx.seq[ci].sym);
+        var cpk = ct ? TR.voicingAtPosition(ct.rootPc, ct.quality, p,
+          prevV ? { anchor: prevV, bassPc: ct.bassPc } : { bassPc: ct.bassPc }) : null;
+        chain.push(cpk);
+        if (cpk && cpk.best) prevV = cpk.best;
+      }
+    }
+
+    // current chord: full-size role-labeled dots
+    var occupied = {}, curDots = [], nextDots = [], ghosts = [];
+    var t = TR.reduceTriad(cur.sym);
+    var pick = chain ? chain[pr.idx]
+      : t ? TR.voicingAtPosition(t.rootPc, t.quality, p,
+          { stringSetPref: setPref, bassPc: t.bassPc }) : null;
+    var v = pick && pick.best;
+    if (v) {
+      v.notes.forEach(function (n) {
+        occupied[n.string + ':' + n.fret] = 1;
+        curDots.push({ string: n.string, fret: n.fret, role: n.role,
+                       label: dispRole(n.role),
+                       title: cur.sym + ' — ' + dispRole(n.role) });
+      });
+    }
+    // next chord: faint preview (role-colored, dim). Chain wrap at the last
+    // chord previews chain[0] — the anchorless restart is where stepping lands.
+    var nt = nxt ? TR.reduceTriad(nxt.sym) : null;
+    var npick = chain ? (nxt ? chain[(pr.idx + 1) % len] : null)
+      : nt ? TR.voicingAtPosition(nt.rootPc, nt.quality, p,
+          { stringSetPref: setPref, bassPc: nt.bassPc }) : null;
+    if (npick && npick.best) {
+      npick.best.notes.forEach(function (n) {
+        var k = n.string + ':' + n.fret;
+        if (occupied[k]) return;
+        occupied[k] = 1;
+        nextDots.push({ string: n.string, fret: n.fret, role: n.role, dim: true,
+                        title: 'next: ' + nxt.sym });
+      });
+    }
+    // the position's pentatonic box, ghosted
+    TR.pentBoxDots(ctx.key.pc, ctx.key.minor, p).dots.forEach(function (n) {
+      var k = n.string + ':' + n.fret;
+      if (occupied[k]) return;
+      ghosts.push({ string: n.string, fret: n.fret, role: n.role, ghost: true });
+    });
+    var dots = ghosts.concat(nextDots, curDots);
+
+    // all five windows for context, the practiced one active
+    var windows = [];
+    positions.forEach(function (wp) {
+      wp.windows.forEach(function (w) {
+        // only the primary window lights up — the octave-wrap instance is
+        // the same shape but not where the hand is (centrality scores there)
+        windows.push({ from: w[0], to: w[1], label: wp.shape,
+                       active: wp === p && w[0] === wp.frame });
+      });
+    });
+
+    // controls
+    var out = ['<div class="pr-controls">'];
+    out.push('<span class="ts-sub">Position</span><span class="pos-seg">');
+    positions.forEach(function (pp) {
+      out.push('<button class="mini' + (pp === p ? ' active' : '') +
+        '" data-act="triad-pos" data-v="' + pp.index + '">' +
+        esc(triadPosLabel(pp)) + '</button>');
+    });
+    out.push('</span><span class="ts-sub">Strings</span><span class="pos-seg">');
+    TRIAD_SET_IDS.forEach(function (id) {
+      out.push('<button class="mini' + (setPref === id ? ' active' : '') +
+        '" data-act="triad-strings" data-v="' + id + '">' + id + '</button>');
+    });
+    out.push('<button class="mini' + (setPref === 'near' ? ' active' : '') +
+      '" data-act="triad-strings" data-v="near" ' +
+      'title="Voice-leading chain: each triad closest to the previous chord’s">Near</button>');
+    out.push('</span></div>');
+
+    // info line: big current chord, caption, flags, next preview
+    var flag = pick && pick.outOfPosition ? '<span class="ts-flag out">off-pos</span>'
+             : pick && pick.relaxed ? '<span class="ts-flag">±' + pick.relaxed + 'fr</span>' : '';
+    var tLabel = t ? CT.pcName(t.rootPc, CT.keyPrefersFlat(ctx.key.pc, ctx.key.minor)) +
+      TR.TRIAD_SUFFIX[t.quality] : null;
+    out.push('<div class="pr-info">' +
+      '<button class="icon pr-navbtn" data-act="practice-prev" title="Previous chord (←)">‹</button>' +
+      '<span class="pr-cur">' + esc(cur.sym) + '</span>' +
+      '<span class="pr-cur-cap">' +
+        esc((tLabel && tLabel !== cur.sym ? 'as ' + tLabel + ' · ' : '') +
+            (v ? triadInvName(v.inversion) + ' · strings ' + v.stringSet : 'no voicing')) +
+      '</span>' + flag +
+      '<span class="pr-count">' + (pr.idx + 1) + ' / ' + len + '</span>' +
+      (nxt ? '<span class="pr-next">next: <b>' + esc(nxt.sym) + '</b></span>' : '') +
+      '<button class="icon pr-navbtn" data-act="practice-next" title="Next chord (space)">›</button>' +
+      '</div>');
+
+    out.push('<div class="pr-neck">' + FB.renderNeckSVG({
+      fretCount: 15, dots: dots, windows: windows,
+      ariaLabel: cur.sym + ' triad in the ' + p.shape + '-shape position, ' +
+        ctx.key.name + ' pentatonic box'
+    }) + '</div>');
+
+    // progression rail
+    out.push('<div class="pr-rail">');
+    ctx.seq.forEach(function (step, i) {
+      if (step.section) out.push('<span class="pr-sec">' + esc(step.section) + '</span>');
+      out.push('<button class="pr-chip' + (i === pr.idx ? ' cur' : '') +
+        '" data-act="practice-jump" data-i="' + i + '">' + esc(step.sym) + '</button>');
+    });
+    out.push('</div>');
+    out.push('<div class="pr-hint">space / → next · ← back · 1–5 or [ ] position · esc back to song</div>');
+    return out.join('');
+  }
+
+  function practiceHTML() {
+    var song = App.state.songId ? Store.getSong(App.state.songId) : null;
+    return '<div class="toolbar">' +
+      '<button class="icon" data-act="toggle-sidebar" title="Library">☰</button>' +
+      '<div class="titleblock"><div class="t">' + esc(song ? song.title : 'Practice') + '</div>' +
+      '<div class="a">Practice — step the progression</div></div>' +
+      '<button data-act="back-to-song">‹ Back to song</button></div>' +
+      '<div class="practice-wrap"><div id="practice-body">' + practiceBodyHTML() + '</div></div>';
+  }
+
+  function updatePractice() {
+    var host = $('#practice-body');
+    if (!host) { render(); return; }
+    host.innerHTML = practiceBodyHTML();
+    var cur = $('.pr-chip.cur');
+    if (cur && cur.scrollIntoView) {
+      cur.scrollIntoView({ block: 'nearest', inline: 'center' });
+    }
+  }
+
   /* ---------- modals ---------- */
 
   function openModal(html, cls) {
@@ -1223,8 +1481,7 @@
       return { position: frets ? adhocWindow(frets) : null,
                posLabel: '', stringSetPref: setPref };
     }
-    var setPref2 = TRIAD_SET_IDS.indexOf(settings.triadStrings) !== -1
-      ? settings.triadStrings : '1-3';
+    var setPref2 = triadStringsPref();
     var song = App.state.songId ? Store.getSong(App.state.songId) : null;
     var pos = String(settings.triadPos || 'any');
     if (song && pos !== 'any') {
@@ -1262,11 +1519,14 @@
           })[0] || null;
         }
         if (!v) {
+          // 'near' has no fixed set — the top chart falls to the chain's
+          // first-chord rule (centrality / near-nut, set free)
+          var nearTop = anchor.stringSetPref === 'near';
           var pk0 = anchor.position
             ? TR.voicingAtPosition(t.rootPc, t.quality, anchor.position,
-                { stringSetPref: anchor.stringSetPref })
+                { stringSetPref: nearTop ? null : anchor.stringSetPref })
             : TR.voicingAnywhere(t.rootPc, t.quality,
-                { stringSetPref: anchor.stringSetPref });
+                { stringSetPref: nearTop ? null : anchor.stringSetPref, near: nearTop });
           v = pk0 && pk0.best;
         }
       }
@@ -1298,16 +1558,21 @@
       if (anchor.kind === 'triad' && TR) {
         var st = TR.reduceTriad(item.sym);
         if (!st) return null;
+        // in Near mode, candidates hug the clicked voicing itself —
+        // "what else could I play right here, moving the least?"
+        var nearSub = anchor.stringSetPref === 'near' && topFrets;
+        var so = nearSub
+          ? { anchor: { frets: topFrets }, bassPc: st.bassPc }
+          : { stringSetPref: anchor.stringSetPref, bassPc: st.bassPc };
+        if (nearSub && !anchor.position) so.near = true;
         var pk = anchor.position
-          ? TR.voicingAtPosition(st.rootPc, st.quality, anchor.position,
-              { stringSetPref: anchor.stringSetPref, bassPc: st.bassPc })
-          : TR.voicingAnywhere(st.rootPc, st.quality,
-              { stringSetPref: anchor.stringSetPref, bassPc: st.bassPc });
+          ? TR.voicingAtPosition(st.rootPc, st.quality, anchor.position, so)
+          : TR.voicingAnywhere(st.rootPc, st.quality, so);
         if (!pk || !pk.best) return null;
         var flag = pk.outOfPosition ? '<span class="ts-flag out">off-pos</span>'
                  : pk.relaxed ? '<span class="ts-flag">±' + pk.relaxed + 'fr</span>' : '';
         return { html: DG.renderChordSVG(pk.best, { label: '', showFingers: false,
-                   roles: triadRoles(pk.best) }), flag: flag };
+                   roles: triadRoles(pk.best) }), flag: flag, frets: pk.best.frets };
       }
       var vs = V.getVoicings(item.sym, 8);
       if (!vs.length) return null;
@@ -1323,7 +1588,8 @@
       var parts = ['<div class="sub-head">Instead, try</div><div class="sub-items">'];
       shown.forEach(function (item) {
         var c = subChart(item);
-        parts.push('<button class="sub-item" data-sub="' + esc(item.sym) + '">' +
+        parts.push('<button class="sub-item" data-sub="' + esc(item.sym) + '"' +
+          (c && c.frets ? ' data-frets="' + c.frets.join(',') + '"' : '') + '>' +
           '<span class="sub-dg">' + (c ? c.html : '') + '</span>' +
           '<span class="sub-txt"><span class="sub-sym">' + esc(item.sym) +
           (item.roman ? ' <i class="sub-roman">' + esc(item.roman) + '</i>' : '') +
@@ -1386,9 +1652,15 @@
     bd.addEventListener('click', function (e) {
       var si = e.target.closest ? e.target.closest('.sub-item[data-sub]') : null;
       if (si) {
+        // forward the candidate's own voicing so the drilled modal's top
+        // chart IS the chart that was clicked — in Near mode the pick
+        // depended on the discarded anchor, so re-picking anchorless there
+        // showed a different voicing (and mis-anchored the next level)
+        var sif = si.getAttribute('data-frets');
         subsModal(si.getAttribute('data-sub'),
           { kind: anchor.kind,
-            frets: anchor.kind === 'chord' ? topFrets : null,  // triad: let the position pick
+            frets: anchor.kind === 'chord' ? topFrets
+              : sif ? sif.split(',').map(Number) : null,
             position: anchor.position, posLabel: anchor.posLabel,
             stringSetPref: anchor.stringSetPref },
           { ctx: ctx, stack: stack.concat([{ sym: sym, frets: topFrets }]) });
@@ -1642,6 +1914,7 @@
     else if (st.view === 'setlists') h = '#setlists';
     else if (st.view === 'setlist' && st.setlistId) h = '#setlist/' + st.setlistId;
     else if (st.view === 'fretboard') h = '#fretboard';
+    else if (st.view === 'practice' && st.songId) h = '#practice/' + st.songId;
     if (h && location.hash !== h) {
       try { history.replaceState(null, '', h); } catch (e) { /* file:// quirk */ }
     } else if (!h && location.hash) {
@@ -1663,6 +1936,9 @@
       App.state.view = 'setlist'; App.state.setlistId = parts[1];
     } else if (parts[0] === 'fretboard') {
       App.state.view = 'fretboard';
+    } else if (parts[0] === 'practice' && parts[1] && Store.getSong(parts[1])) {
+      App.state.view = 'practice';
+      App.state.songId = parts[1];
     }
   }
 
@@ -1771,12 +2047,28 @@
         break;
       case 'triad-pos':
         Store.setSetting('triadPos', actEl.getAttribute('data-v'));
-        updateTriadStrip();
+        if (st.view === 'practice') updatePractice(); else updateTriadStrip();
         break;
       case 'triad-strings':
         Store.setSetting('triadStrings', actEl.getAttribute('data-v'));
-        updateTriadStrip();
+        if (st.view === 'practice') updatePractice(); else updateTriadStrip();
         break;
+      case 'view-practice':
+        App.state.practice = { idx: 0 };
+        st.view = 'practice';
+        st.perform = null;
+        st.sidebarOpen = false;
+        autoStop();
+        render();
+        break;
+      case 'practice-next': practiceStep(1); break;
+      case 'practice-prev': practiceStep(-1); break;
+      case 'practice-jump': {
+        var pj = App.state.practice || (App.state.practice = { idx: 0 });
+        pj.idx = parseInt(actEl.getAttribute('data-i'), 10) || 0;
+        updatePractice();
+        break;
+      }
       case 'view-fretboard': {
         var ex0 = getExplorer();
         var fbRoot = actEl.getAttribute('data-root');
@@ -1979,8 +2271,32 @@
 
   document.addEventListener('keydown', function (e) {
     var inField = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
-    if (e.key === 'Escape') { closeModal(); return; }
+    if (e.key === 'Escape') {
+      if ($('#modal-backdrop')) { closeModal(); }
+      else if (App.state.view === 'practice' && !inField) { App.state.view = 'song'; render(); }
+      return;
+    }
     if (inField) return;
+    if (App.state.view === 'practice' && !$('#modal-backdrop') &&
+        !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); practiceStep(1); return; }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); practiceStep(-1); return; }
+      if (e.key === 'Home') { e.preventDefault(); App.state.practice = { idx: 0 }; updatePractice(); return; }
+      if (e.key === '[' || e.key === ']') {
+        e.preventDefault();
+        var cur5 = parseInt(Store.getSettings().triadPos, 10) || 1;
+        var next5 = ((cur5 - 1 + (e.key === ']' ? 1 : 4)) % 5) + 1;
+        Store.setSetting('triadPos', String(next5));
+        updatePractice();
+        return;
+      }
+      if (/^[1-5]$/.test(e.key)) {
+        e.preventDefault();
+        Store.setSetting('triadPos', e.key);
+        updatePractice();
+        return;
+      }
+    }
     if (e.key === ' ' && App.state.view === 'song' && !$('#modal-backdrop')) {
       e.preventDefault();
       if (!Store.getSettings().fitMode) Auto.on ? autoStop() : autoStart();

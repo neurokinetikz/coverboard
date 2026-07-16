@@ -267,13 +267,9 @@ input[type="range"] { accent-color: var(--accent); }
 .song-scroll.fit .section { break-inside: auto; margin: 8px 0 10px; }
 .song-scroll.fit .section-head { break-after: avoid; }
 .song-scroll.fit .line, .song-scroll.fit pre.tabline { break-inside: avoid; }
-.song-scroll.fit .diagram-strip { column-span: all; margin-bottom: 8px; padding: 6px 8px 2px; }
-/* keep the pentatonics zone's reserved width in fit mode (this three-class
-   fit rule otherwise out-specifies .diagram-strip.has-scale) */
-.song-scroll.fit .diagram-strip.has-scale { padding-right: 306px; }
-.song-scroll.fit .diagram-strip .dg { flex-basis: 136px; }
-.song-scroll.fit .triad-strip { column-span: all; margin-bottom: 8px; padding: 6px 8px 4px; }
-.song-scroll.fit .triad-strip .ts-tile { flex-basis: 136px; }
+/* the strips live above the columns now — pinned, full viewport width */
+.main > .diagram-strip, .main > .triad-strip { margin: 8px 12px; }
+.song-cols { flex: 1; min-height: 0; display: flex; }
 
 .diagram-strip {
   display: flex; gap: 4px; flex-wrap: wrap; align-items: flex-start;
@@ -545,37 +541,58 @@ pre.tabline {
 }
 .triad-strip .dg { cursor: pointer; border-radius: 8px; padding: 2px; width: 100%; }
 .triad-strip .dg:hover { background: var(--bg-inset); }
-/* pentatonic-box card: anchored at the strip's right edge in its own zone —
-   "play this scale in this position" — while the chord tiles stay centered.
-   The reserved right padding keeps shrinking tiles from colliding with it. */
-.ts-tiles.has-scale,
-.diagram-strip.has-scale { padding-right: 306px; }
-.ts-tiles.has-scale { min-height: 180px; }
-.diagram-strip.has-scale { position: relative; min-height: 212px; }
-/* flush with the strip's top padding, level with the selector row */
-.ts-scale-zone {
-  position: absolute; right: 10px; top: 10px;
-  display: flex; flex-direction: column; gap: 5px;
+/* scales column: all five CAGED positions, nut first, pinned to the right
+   edge — one row per position (key's pentatonic + parallel flavor), rows
+   share the height equally and the charts scale with the viewport */
+/* deterministic width (never derived from height — tall narrow windows used
+   to balloon the cards past the viewport edge); charts contain-fit both ways */
+.scale-col {
+  flex: 0 0 clamp(200px, 24vw, 330px); display: flex; flex-direction: column; gap: 5px;
+  padding: 8px 12px 10px; border-left: 1px solid var(--border);
+  overflow: hidden;
 }
+.scale-col .ts-zone-head { flex: 0 0 auto; padding-bottom: 1px; }
 .ts-zone-head { display: flex; align-items: center; justify-content: center; }
-.ts-zone-cards { display: flex; gap: 8px; }
+/* two flavor sub-columns; rows align because both stacks share the same
+   header height and equal-flex cards. flex bases are 0 (not auto) so the
+   SVGs' intrinsic size never blocks shrinking on short windows */
+.sc-grid { flex: 1 1 0; min-height: 0; display: flex; gap: 10px; justify-content: center; }
+/* names in their own header row, flush under the PENTATONICS label and
+   aligned over the two flavor stacks */
+.sc-names { flex: 0 0 auto; display: flex; gap: 10px; }
+.sc-name {
+  flex: 1 1 0; min-width: 0; text-align: center;
+  font-size: 17px; font-weight: 800; color: var(--chord);
+}
+.sc-names .sc-name + .sc-name { padding-left: 11px; }  /* mirror the divider */
+/* rows are content-sized (chart height follows card width); the first card
+   hugs the names, the last hugs the window bottom, leftover spreads thinly */
+.sc-flavor {
+  flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
+  gap: 4px; min-height: 0; justify-content: space-between;
+}
+.sc-flavor + .sc-flavor { border-left: 1px solid var(--border); padding-left: 10px; }
+.sc-flavor .ts-scale { flex: 0 1 auto; min-height: 0; }
+.sc-blank { visibility: hidden; }
+/* bare charts — no boxes; the caption carries hover/active states */
 .ts-scale {
-  width: 142px;
   display: flex; flex-direction: column; align-items: center; gap: 2px;
-  cursor: pointer; border-radius: 10px; padding: 5px 8px 6px;
-  background: color-mix(in srgb, var(--accent) 7%, var(--bg-panel));
-  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  min-height: 0;
+  cursor: pointer; border-radius: 8px; padding: 2px 5px 3px;
 }
-/* the card matching the song's key stays highlighted */
-.ts-scale.active,
-.ts-scale:hover {
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-  background: color-mix(in srgb, var(--accent) 13%, var(--bg-panel));
+.ts-scale:hover { background: var(--bg-inset); }
+.ts-scale .ts-cap { border-radius: 8px; padding: 0 8px; }
+.ts-scale.active .ts-cap {
+  background: var(--accent); color: var(--accent-text); font-weight: 700;
 }
-.ts-scale .ts-neck { width: 100%; }
-.ts-scale .chord-svg { width: 100%; height: auto; display: block; }
-.ts-scale .ts-cap { margin-top: -6px; }
+.ts-scale .ts-neck {
+  flex: 0 1 auto; min-height: 0; width: 100%;
+  display: flex; justify-content: center; align-items: center;
+}
+/* width-driven with a height clamp: grows with the viewport in BOTH
+   dimensions but can never overlap neighbors or spill off screen */
+.ts-scale .chord-svg { width: 100%; height: auto; max-height: 100%; display: block; }
+.ts-scale .ts-cap { margin-top: 0; white-space: nowrap; }
 .ts-scale .ts-cap2 { font-size: 9px; opacity: 0.8; margin-top: 1px; }
 .chord-svg .cd-ghost circle { fill: var(--text-dim); }
 .chord-svg .cd-ghost { opacity: 0.45; }
@@ -654,8 +671,47 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
 .fbv .chord-svg { width: 144px; height: 179px; }
 .fbv-cap { font-size: 10px; color: var(--text-dim); margin-top: -8px; }
 
+/* ---------- practice mode ---------- */
+
+.practice-wrap {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: 14px 22px; max-width: 1500px; margin: 0 auto; width: 100%;
+}
+.pr-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+.pr-info { display: flex; align-items: center; gap: 14px; margin: 10px 0; flex-wrap: wrap; }
+.pr-cur { font-size: 36px; font-weight: 800; color: var(--chord); line-height: 1; }
+.pr-cur-cap { font-size: 12.5px; color: var(--text-dim); }
+.pr-count { font-size: 12px; color: var(--text-dim); }
+.pr-next { margin-left: auto; font-size: 13px; color: var(--text-dim); }
+.pr-next b { color: var(--text); font-size: 19px; margin-left: 4px; }
+.pr-navbtn { font-size: 16px; }
+.pr-neck {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px;
+}
+.pr-neck svg { width: 100%; height: auto; display: block; }
+.pr-rail {
+  display: flex; gap: 4px; align-items: center;
+  overflow-x: auto; padding: 12px 2px 6px;
+}
+.pr-sec {
+  flex: 0 0 auto; font-size: 9.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.6px; color: var(--text-dim); margin: 0 6px 0 10px;
+}
+.pr-rail .pr-sec:first-child { margin-left: 0; }
+.pr-chip {
+  flex: 0 0 auto; font-size: 13px; font-weight: 700; padding: 4px 11px;
+  border-radius: 8px; background: var(--bg-inset); border: 1px solid var(--border);
+  color: var(--chord); cursor: pointer;
+}
+.pr-chip.cur { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.pr-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; text-align: center; }
+
 /* ---------- responsive ---------- */
 
+@media (max-width: 900px) {
+  .scale-col { display: none; }
+}
 @media (max-width: 760px) {
   .sidebar { position: fixed; z-index: 40; height: 100%; transform: translateX(-100%); transition: transform 0.2s; }
   .sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,0.4); }
@@ -670,6 +726,7 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
   #app { display: block; height: auto; }
   .sidebar, .toolbar button, .toolbar .tgroup, .diagram-strip .dg:hover, .perform-bar { display: none !important; }
   .ts-head { display: none !important; }
+  .scale-col { display: none !important; }
   .ts-flag { display: none; }
   /* paper has no horizontal scroll — let strips wrap when printing */
   .ts-tiles, .diagram-strip { flex-wrap: wrap; overflow: visible; }

@@ -48,8 +48,12 @@ Two controls drive the strip:
   leaving the position. When a chord has no strict in-window voicing, the
   engine widens by a fret and says so (`±1fr`), or flags a genuine position
   break (`off-pos`) — it never lies.
-- **Strings** — which adjacent string set to practice on (`1-3 | 2-4 | 3-5 | 4-6`).
-  Hold a position and cycle the sets, or hold a set and walk the positions.
+- **Strings** — which adjacent string set to practice on (`1-3 | 2-4 | 3-5 | 4-6`),
+  or **Near**: a voice-leading chain where each triad is voiced *closest to the
+  previous chord's* — common tones stay put, the string set floats, and the whole
+  progression connects with minimal hand movement inside the position. Hold a
+  position and cycle the sets, hold a set and walk the positions, or switch to
+  Near and hear the chords melt into each other.
 
 Chords richer than a triad reduce honestly:
 
@@ -79,10 +83,25 @@ buttons — tapping `F♯` vs `G♭` spells everything accordingly) and any qual
 - an optional **CAGED overlay** shading the five position windows
 - the discrete voicing charts below the neck — tap any to open substitutions
 
-And in the song view: pick a CAGED position in the triad strip and a compact
-**pentatonic-box card** appears at the end of the row — that exact five-fret
-window with the key's pentatonic dots, tonics in root-blue. Tap it to open the
-explorer with everything pre-set.
+And in the song view: a **pentatonics column** pins to the right edge — all
+five CAGED positions, nut first, in two stacks (the key's pentatonic and its
+parallel flavor, each named once at the top). Tonics in root-blue, captions
+like `E shape · 5fr`, the selected triad position highlighted, and the cards
+grow with your screen. Tap any card to open the explorer with everything
+pre-set.
+
+## Learn: practice mode
+
+**▶ Practice** in the triad strip opens the drill the whole feature builds toward:
+*play the entire song in one position*. A full neck is locked to your chosen CAGED
+position — the pentatonic box as ghost dots, the **current chord's triad**
+role-labeled inside it, the **next chord's triad** faint so your hand knows where
+it's going. The space bar steps the song's *actual progression* (consecutive
+repeats collapsed); a chip rail below shows where you are, section by section.
+
+Keys: `space`/`→` next · `←` back · `Home` restart · `1–5` or `[` `]` switch
+position · `esc` back to the song. Master a position, press `2`, do it again —
+then mix positions in performance.
 
 ## Learn: chord substitutions
 
@@ -154,6 +173,6 @@ both `index.html` and `build.js` (the build fails loudly if they drift).
 node tests/run.js
 ```
 
-856 assertions across the parser, chord theory, voicing generator, triad/CAGED
+911 assertions across the parser, chord theory, voicing generator, triad/CAGED
 engine (including hand-verified fret literals), substitution rule tables, and
 both SVG renderers. Pure Node — no browser or DOM required.

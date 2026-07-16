@@ -44,7 +44,7 @@
         fitMode: true,         // fit whole song to the viewport in columns
         showTriads: false,     // song view: triad strip instead of voicing strip
         triadPos: 'any',       // triad strip CAGED position ('any' | '1'..'5')
-        triadStrings: '1-3',   // triad strip string set ('1-3'|'2-4'|'3-5'|'4-6')
+        triadStrings: '1-3',   // triad strip string set ('1-3'|'2-4'|'3-5'|'4-6'|'near')
         sidebarCollapsed: false // desktop: hide the library panel
       }
     };

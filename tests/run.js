@@ -960,6 +960,46 @@ function deepEq(a, b, name) {
   deepEq(stAny.chords[2].atPosition.best.frets, [X, X, X, 2, 3, 2], 'D any = open-D top');
   deepEq(stAny.chords[3].atPosition.best.frets, [X, X, X, 2, 1, 0], 'Am any = open-Am top');
 
+  // --- near mode (voice-leading chain) ---
+  // Anchored score: 30*bassMatch + 9*commonPairs - |sumMidi(v) - sumMidi(anchor)|.
+  // All literals hand-derived from the E-shape-of-G pool (frame 3, window [3,7]).
+  var stN = T.songTriads(['G', 'C', 'D', 'Em'], { key: 'G', position: 'E', stringSetPref: 'near' });
+  deepEq(stN.chords[0].atPosition.best.frets, [X, 5, 5, 4, X, X],
+         'near: anchorless start = most central, set floats');
+  deepEq(stN.chords[1].atPosition.best.frets, [X, 7, 5, 5, X, X],
+         'near: C holds G3 on the same string/fret (D→E, B→C)');
+  deepEq(stN.chords[2].atPosition.best.frets, [5, 5, 4, X, X, X],
+         'near: D exact tie (dist 18 both ways) broken by minFret');
+  deepEq(stN.chords[3].atPosition.best.frets, [7, 7, 5, X, X, X],
+         'near: Em pure stepwise ascent above D');
+  eq(stN.chords[3].atPosition.relaxed, false, 'near: chain stays strict in window');
+  deepEq(T.voicingAtPosition(7, 'maj', posG[1], {}).best.frets, [X, 5, 5, 4, X, X],
+         'no pref + no anchor = pure centrality (near first-chord rule)');
+  // common tone outranks raw proximity: anchor C on 2-4 (sum 179); G candidates:
+  // [x,x,5,4,3] d3 c1 → +6; [x,5,5,4] d15 c1 → -6; [x,x,x,4,3,3] d9 c0 → -9
+  var nG = T.voicingAtPosition(7, 'maj', posG[1], { anchor: { frets: [X, X, 5, 5, 5, X] } });
+  deepEq(nG.best.frets, [X, X, 5, 4, 3, X], 'near: G after C-on-2-4 holds G3');
+  deepEq(nG.alternates[0].frets, [X, 5, 5, 4, X, X],
+         'near: 1 common tone outranks 6 semitones of extra drift');
+  deepEq(T.voicingAtPosition(7, 'maj', posG[1], { stringSetPref: 'near' }).best.frets,
+         [X, 5, 5, 4, X, X], 'unknown stringSetPref sanitized to centrality (no NaN)');
+  // E-shape of D (frame 10): [x,12,12,11] re-voices the open-D top's exact
+  // pitches (A3 D4 F#4) an octave position up → distance 0 wins outright
+  var aD = { frets: [X, X, X, 2, 3, 2] };
+  deepEq(T.voicingAtPosition(2, 'maj', posD[4], { anchor: aD }).best.frets,
+         [X, 12, 12, 11, X, X], 'near: identical pitches at the new position win (dist 0)');
+  deepEq(T.voicingAtPosition(2, 'maj', posD[4], { anchor: aD, bassPc: 6 }).best.frets,
+         [14, 12, 12, X, X, X], 'near: slash bass (+30) steers the anchored pick');
+  // 'any' + near: whole neck, no ladder — start near the nut with the set free
+  var stAnyN = T.songTriads(['C', 'G'], { key: 'C', position: 'any', stringSetPref: 'near' });
+  deepEq(stAnyN.chords[0].atPosition.best.frets, [X, 3, 2, 0, X, X],
+         'near any: start near the nut, set free');
+  deepEq(stAnyN.chords[1].atPosition.best.frets, [X, 2, 0, 0, X, X],
+         'near any: G/B — C→B, E→D, G held');
+  var stMap = T.songTriads(['G', 'C'], { key: 'G', stringSetPref: 'near' });
+  deepEq(stMap.chords[1].byPosition.E.best.frets, [X, 7, 5, 5, X, X],
+         'near byPosition: per-shape chain threads');
+
   // --- per-song plumbing ---
   var st3 = T.songTriads(['G', 'C', 'D', 'Em']);
   eq(st3.key.name, 'G', 'key detected from chords');

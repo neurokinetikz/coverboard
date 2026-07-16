@@ -177,12 +177,14 @@
     var hasOpenRow = startFret === 0;       // open-string dots above the nut
     var nStrings = 6;
 
-    var padTop = label ? 15 : 4;            // same name slot as chord charts
-    var markerRow = hasOpenRow ? 9 : 2;
+    var padTop = label ? 15 : 2;            // same name slot as chord charts
+    // uniform header row (open dots or nothing) and a uniform right gutter
+    // for the side fret tag — every card gets the SAME grid box
+    var markerRow = 9;
     var gridTop = padTop + markerRow;
-    var padLeft = 13, padRight = base > 1 ? 20 : 8;
+    var padLeft = 13, padRight = 24;
     var gridW = W - padLeft - padRight;
-    var gridH = H - gridTop - 8;
+    var gridH = H - gridTop - 4;
     var sx = gridW / (nStrings - 1);
     var fy = gridH / nFrets;
     var sxDot = (W - padLeft - 8) / (nStrings - 1);
@@ -206,8 +208,8 @@
       out.push('<rect x="' + (padLeft - 1) + '" y="' + (gridTop - 2.4) + '" width="' + (gridW + 2) +
                '" height="2.8" rx="1" class="cd-nut"/>');
     } else {
-      out.push('<text x="' + (W - padRight + 4) + '" y="' + (gridTop + fy * 0.65) +
-               '" font-size="8.5" class="cd-basefret">' + base + 'fr</text>');
+      out.push('<text x="' + (W - padRight + 8) + '" y="' + (gridTop + fy * 0.65) +
+               '" font-size="9.5" class="cd-basefret">' + base + 'fr</text>');
     }
     for (var f = 0; f <= nFrets; f++) {
       out.push('<line x1="' + padLeft + '" y1="' + fretY(f) + '" x2="' + (padLeft + gridW) +
