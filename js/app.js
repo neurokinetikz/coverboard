@@ -856,11 +856,6 @@
         '<button data-act="font" data-d="1">＋</button>' +
       '</div>' +
       '<button data-act="toggle-fit" class="' + (fit ? 'active' : '') + '" title="Fit the whole song on screen in columns">⛶ Fit</button>' +
-      (fit ? '' :
-      '<div class="tgroup" title="Autoscroll">' +
-        '<button data-act="autoscroll" id="autoscroll-btn">' + (Auto.on ? '⏸' : '▶') + '</button>' +
-        '<input type="range" min="8" max="120" step="2" value="' + Auto.speed + '" id="autoscroll-speed" style="width:70px">' +
-      '</div>') +
       '<button data-act="toggle-diagrams" class="' + (settings.showDiagrams ? 'active' : '') + '" title="Chord diagrams">◫ Chords</button>' +
       '<button data-act="toggle-triads" class="' + (settings.showTriads ? 'active' : '') + '" title="Triad charts at CAGED positions">△ Triads</button>' +
       '<button data-act="edit-song" class="icon" title="Edit">✎</button>' +
