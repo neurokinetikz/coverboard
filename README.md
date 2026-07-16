@@ -38,7 +38,14 @@ Toggle **△ Triads** in the song toolbar and the diagram strip switches to
 **triad charts** — every chord in the song reduced to its playable three-note
 shape, with each note color-coded by interval role:
 
-> ● root (blue) · ● 3rd (amber) · ● 5th (green) · ● 7th/6th (violet)
+> ● root (blue) · ● 3rd (amber) · ● 5th (soft green) · ● 7th/6th (purple)
+
+The colors follow function, not a rainbow: blue = home (the root), soft
+green = the safe landing (the 5th), warm amber = the identity note (the 3rd —
+or the sus 2/4 that replaces it), purple = the color a 7th adds, gray = context
+(altered 5ths keep the 5th color — the ♭5/♯5 label carries the tension). Scale ghosts carry a faint tint of their family;
+passing tones stay gray. The ◫ Chords strip keeps classic ink-and-fingers
+charts — colors live in the learning views.
 
 Three controls drive the strip:
 

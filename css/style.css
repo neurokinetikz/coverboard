@@ -325,6 +325,7 @@ input[type="range"] { accent-color: var(--accent); }
 .chord-svg .cd-3 circle { fill: var(--fb-3); }
 .chord-svg .cd-5 circle { fill: var(--fb-5); }
 .chord-svg .cd-7 circle { fill: var(--fb-7); }
+.chord-svg .cd-n circle { fill: var(--text-dim); }
 .chord-svg .cd-role { font-weight: 700; fill: #101319; }
 .chord-svg .cd-r .cd-role { fill: #ffffff; }
 /* light theme: all role fills are deep tones -> white labels throughout */
@@ -651,8 +652,18 @@ pre.tabline {
 .ts-scale .chord-svg { width: 100%; height: auto; max-height: 100%; display: block; }
 .ts-scale .ts-cap { margin-top: 0; white-space: nowrap; }
 .ts-scale .ts-cap2 { font-size: 9px; opacity: 0.8; margin-top: 1px; }
-.chord-svg .cd-ghost circle { fill: var(--text-dim); }
-.chord-svg .cd-ghost { opacity: 0.45; }
+/* ghosts are fully opaque so dots cover the string lines — the whisper
+   comes from pre-blending each family color toward the background */
+.chord-svg .cd-ghost { opacity: 1; }
+.chord-svg .cd-r.cd-ghost circle { fill: color-mix(in srgb, var(--fb-r) 50%, var(--bg)); }
+.chord-svg .cd-3.cd-ghost circle { fill: color-mix(in srgb, var(--fb-3) 50%, var(--bg)); }
+.chord-svg .cd-5.cd-ghost circle { fill: color-mix(in srgb, var(--fb-5) 50%, var(--bg)); }
+.chord-svg .cd-7.cd-ghost circle { fill: color-mix(in srgb, var(--fb-7) 50%, var(--bg)); }
+.chord-svg .cd-n.cd-ghost circle { fill: color-mix(in srgb, var(--text-dim) 50%, var(--bg)); }
+/* neutral context dots keep a subtle translucency — terrain, not targets */
+.chord-svg .cd-n.cd-ghost { opacity: 0.75; }
+/* open-string notes float above the nut — a subtle dark rim defines them */
+.chord-svg .cd-open-note circle { stroke: rgba(0, 0, 0, 0.45); stroke-width: 0.7; }
 .triad-strip .chord-svg { width: 100%; height: auto; display: block; }
 .ts-legend {
   display: flex; gap: 9px; align-items: center;
@@ -672,8 +683,14 @@ pre.tabline {
 /* ---------- fretboard explorer ---------- */
 
 /* light theme uses deeper tones so white labels read cleanly at dot size */
-html[data-theme="light"] { --fb-r: #2f6fed; --fb-3: #b45309; --fb-5: #15803d; --fb-7: #7c3aed; }
-html[data-theme="dark"]  { --fb-r: #4d8dff; --fb-3: #fbbf24; --fb-5: #4ade80; --fb-7: #a78bfa; }
+/* hue = function family, intensity = importance:
+   blue = home (the root), soft green = the safe landing (the 5th),
+   amber = identity (the 3rd — or the sus 2/4 that replaces it),
+   purple = the color a 7th/6th adds,
+   gray = context (ghosts, passing tones). Altered 5ths share the 5th color —
+   the ♭5/♯5 label carries the alteration (user call, no fifth hue). */
+html[data-theme="light"] { --fb-r: #2f6fed; --fb-3: #b8430e; --fb-5: #2b9457; --fb-7: #7649c9; }
+html[data-theme="dark"]  { --fb-r: #4d8dff; --fb-3: #f6a13c; --fb-5: #6ee08e; --fb-7: #a58ae8; }
 
 .page-pad-wide { max-width: none; flex: 1; min-height: 0; }
 .fb-controls { display: flex; flex-direction: column; gap: 9px; margin-bottom: 14px; }
@@ -701,14 +718,20 @@ html[data-theme="dark"]  { --fb-r: #4d8dff; --fb-3: #fbbf24; --fb-5: #4ade80; --
 .fb-dot.fb-3 circle { fill: var(--fb-3); }
 .fb-dot.fb-5 circle { fill: var(--fb-5); }
 .fb-dot.fb-7 circle { fill: var(--fb-7); }
+.fb-dot.fb-n circle { fill: var(--text-dim); }
 .fb-dot .fb-dot-label { font-weight: 700; fill: #101319; }
 .fb-dot.fb-r .fb-dot-label { fill: #ffffff; }
 html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
 .fb-svg .fb-dot.fb-dim { opacity: 0.22; }
-/* scale-layer ghosts: small, neutral, quieter than chord tones but clearly
-   above fb-dim's whisper */
-.fb-svg .fb-dot.fb-ghost circle { fill: var(--text-dim); }
-.fb-svg .fb-dot.fb-ghost { opacity: 0.45; }
+/* scale-layer ghosts: opaque pre-blended tints (cover the string lines);
+   the neck sits on the panel background */
+.fb-svg .fb-dot.fb-ghost { opacity: 1; }
+.fb-svg .fb-dot.fb-r.fb-ghost circle { fill: color-mix(in srgb, var(--fb-r) 50%, var(--bg-panel)); }
+.fb-svg .fb-dot.fb-3.fb-ghost circle { fill: color-mix(in srgb, var(--fb-3) 50%, var(--bg-panel)); }
+.fb-svg .fb-dot.fb-5.fb-ghost circle { fill: color-mix(in srgb, var(--fb-5) 50%, var(--bg-panel)); }
+.fb-svg .fb-dot.fb-7.fb-ghost circle { fill: color-mix(in srgb, var(--fb-7) 50%, var(--bg-panel)); }
+.fb-svg .fb-dot.fb-n.fb-ghost circle { fill: color-mix(in srgb, var(--text-dim) 50%, var(--bg-panel)); }
+.fb-svg .fb-dot.fb-n.fb-ghost { opacity: 0.75; }
 .fb-svg .fb-window {
   fill: color-mix(in srgb, var(--accent) 9%, transparent);
   stroke: color-mix(in srgb, var(--accent) 30%, transparent);
@@ -804,8 +827,9 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
   .fb-svg .fb-string, .fb-svg .fb-fret { stroke: #666; }
   .fb-svg .fb-fretnum, .fb-svg .fb-stringname { fill: #444; }
   .fb-svg .fb-window-label { stroke: #fff; }
-  .fb-svg .fb-dot.fb-ghost circle { fill: #888; }
-  .chord-svg .cd-ghost circle { fill: #888; }
+  .fb-svg .fb-dot.fb-ghost circle { fill: #888 !important; }
+  .chord-svg .cd-ghost circle { fill: #888 !important; }
+  .chord-svg .cd-n circle, .fb-dot.fb-n circle { fill: #888; }
   .toolbar { border: none; background: none; padding: 0 0 8px; }
   .song-scroll, .song-scroll.fit { overflow: visible; height: auto; }
   .song-scroll.fit .song-body {

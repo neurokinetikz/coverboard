@@ -11,14 +11,16 @@
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // role -> color class: the "third slot" tones (3/b3/2/4) share a class,
-  // as do the fifths (5/b5/#5)
+  // role -> color class — hue = function family. MUST stay content-identical
+  // with diagrams.js ROLE_CLASS (cd- prefix) — pinned by tests/run.js.
   var ROLE_CLASS = {
     'R': 'fb-r',
     '3': 'fb-3', 'b3': 'fb-3', '2': 'fb-3', '4': 'fb-3',
     '5': 'fb-5', 'b5': 'fb-5', '#5': 'fb-5',
     'b7': 'fb-7', '7': 'fb-7', '6': 'fb-7', 'b6': 'fb-7'
   };
+  // passing/context tones (scale 2/4/6/b6) never whisper-tint as ghosts
+  var CONTEXT_ROLES = { '2': 1, '4': 1, '6': 1, 'b6': 1 };
 
   /* opts: { fretCount=15 (absolute LAST fret shown),
              startFret=0 (absolute left boundary — a windowed view when > 0;
@@ -135,7 +137,8 @@
     dots.forEach(function (d) {
       if (d.string < 0 || d.string > 5 || d.fret < startFret || d.fret > fretCount) return;
       var cx = dotX(d.fret), cy = sy(d.string);
-      var cls = 'fb-dot ' + (ROLE_CLASS[d.role] || 'fb-3') +
+      var cls = 'fb-dot ' + (d.ghost && CONTEXT_ROLES[d.role]
+                  ? 'fb-n' : ROLE_CLASS[d.role] || 'fb-n') +
         (d.dim ? ' fb-dim' : '') + (d.ghost ? ' fb-ghost' : '');
       var rr = d.ghost ? r * 0.62 : r;
       var label = d.ghost || d.label == null ? '' : String(d.label);
@@ -155,7 +158,7 @@
     return out.join('');
   }
 
-  var api = { renderNeckSVG: renderNeckSVG };
+  var api = { renderNeckSVG: renderNeckSVG, ROLE_CLASS: ROLE_CLASS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.Fretboard = api;
 })(typeof window !== 'undefined' ? window : globalThis);

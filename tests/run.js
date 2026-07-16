@@ -1231,7 +1231,7 @@ function deepEq(a, b, name) {
   var roles2 = [null, null, null, null, null, null];
   open.notes.forEach(function (n) { roles2[n.string] = n.role; });
   var svg2 = DG.renderChordSVG(open, { roles: roles2 });
-  ok(svg2.indexOf('cd-open') === -1, 'open chord tones drawn as role dots');
+  ok(svg2.indexOf('class="cd-open"') === -1, 'open chord tones drawn as role dots (no hollow ring)');
   // minor third label uses the flat glyph
   var em = T.triadsFor(4, 'min').filter(function (x) {
     return x.stringSet === '4-6' && x.inversion === 0;
@@ -1243,6 +1243,69 @@ function deepEq(a, b, name) {
   var plain = DG.renderChordSVG(V.getVoicings('F', 1)[0], { label: 'F' });
   ok(plain.indexOf('cd-r') === -1 && plain.indexOf('cd-barre') !== -1,
      'plain charts unchanged (barre + no role classes)');
+  ok(plain.indexOf('cd-n"') === -1 && plain.indexOf('cd-n ') === -1 &&
+     plain.indexOf('cd-finger') !== -1,
+     'classic charts stay ink-and-fingers (no palette classes)');
+
+  // --- color-system family map ---
+  // the two renderers' maps must be content-identical (b6 divergence fix)
+  var dgMap = {}, fbMap = {};
+  Object.keys(DG.ROLE_CLASS).forEach(function (k) {
+    dgMap[k] = DG.ROLE_CLASS[k].replace('cd-', '');
+  });
+  Object.keys(FB.ROLE_CLASS).forEach(function (k) {
+    fbMap[k] = FB.ROLE_CLASS[k].replace('fb-', '');
+  });
+  deepEq(dgMap, fbMap, 'diagrams and fretboard role maps identical');
+  eq(dgMap.b6, '7', 'b6 belongs to the extension family');
+  eq(dgMap.b5, '5', 'b5 shares the 5th family (label carries the alteration)');
+  eq(dgMap['#5'], '5', '#5 shares the 5th family');
+  eq(dgMap['5'], '5', 'perfect 5th keeps its own class');
+  // altered fifths render the 5th class with the altered label
+  var dimV = T.triadsFor(0, 'dim')[0];
+  var rolesD = [null, null, null, null, null, null];
+  dimV.notes.forEach(function (n) { rolesD[n.string] = n.role; });
+  var dimSvg = DG.renderChordSVG(dimV, { roles: rolesD });
+  ok(dimSvg.indexOf('cd-5') !== -1 && dimSvg.indexOf('♭5') !== -1 &&
+     dimSvg.indexOf('cd-alt') === -1, 'dim: b5 renders the 5th class + ♭5 label');
+  var augV = T.triadsFor(0, 'aug')[0];
+  var rolesA = [null, null, null, null, null, null];
+  augV.notes.forEach(function (n) { rolesA[n.string] = n.role; });
+  var augSvg = DG.renderChordSVG(augV, { roles: rolesA });
+  ok(augSvg.indexOf('cd-5') !== -1 && augSvg.indexOf('♯5') !== -1,
+     'aug: #5 renders the 5th class + ♯5 label');
+  ok(FB.renderNeckSVG({ dots: [{ string: 2, fret: 4, role: 'b5', label: '♭5' }] })
+     .indexOf('fb-5') !== -1, 'fretboard b5 -> fb-5');
+  // unknown roles fall to neutral, never amber
+  var unk = DG.renderScaleSVG({ startFret: 0, endFret: 4,
+    dots: [{ string: 2, fret: 2, role: '9' }] });
+  ok(unk.indexOf('cd-n') !== -1 && unk.indexOf('cd-3') === -1,
+     'unknown role -> neutral, not identity-amber');
+  ok(FB.renderNeckSVG({ dots: [{ string: 2, fret: 2, role: '9' }] })
+     .indexOf('fb-n') !== -1, 'fretboard unknown role -> fb-n');
+  // ghost whisper tint: family classes survive on ghosts; passing tones don't
+  var g3 = DG.renderScaleSVG({ startFret: 0, endFret: 4,
+    dots: [{ string: 2, fret: 2, role: '3', ghost: true }] });
+  ok(g3.indexOf('cd-3 cd-ghost') !== -1, 'ghost 3rd whispers its family tint');
+  var g2 = DG.renderScaleSVG({ startFret: 0, endFret: 4,
+    dots: [{ string: 2, fret: 2, role: '2', ghost: true }] });
+  ok(g2.indexOf('cd-n cd-ghost') !== -1 && g2.indexOf('cd-3') === -1,
+     'ghost passing tone stays neutral gray');
+  var s2 = DG.renderScaleSVG({ startFret: 0, endFret: 4,
+    dots: [{ string: 2, fret: 2, role: '2' }] });
+  ok(s2.indexOf('cd-3') !== -1, 'non-ghost 2 keeps sus identity amber');
+  ok(FB.renderNeckSVG({ dots: [{ string: 2, fret: 2, role: '4', ghost: true }] })
+     .indexOf('fb-n fb-ghost') !== -1, 'fretboard ghost passing tone neutral');
+  ok(FB.renderNeckSVG({ dots: [{ string: 2, fret: 2, role: '5', ghost: true }] })
+     .indexOf('fb-5 fb-ghost') !== -1, 'fretboard ghost 5th whispers green');
+  var g6 = DG.renderScaleSVG({ startFret: 0, endFret: 4,
+    dots: [{ string: 2, fret: 2, role: '6', ghost: true }] });
+  ok(g6.indexOf('cd-n cd-ghost') !== -1, 'ghost 6th is context gray');
+  var c6v = T.triadsFor(0, '6')[0];
+  var roles6 = [null, null, null, null, null, null];
+  c6v.notes.forEach(function (n) { roles6[n.string] = n.role; });
+  ok(DG.renderChordSVG(c6v, { roles: roles6 }).indexOf('cd-7') !== -1,
+     'C6 shell keeps the purple 6 as a chord tone');
 
   // vertical scale-box chart (multi-dot-per-string, chord-diagram idiom)
   var box = DG.renderScaleSVG({

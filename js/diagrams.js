@@ -10,14 +10,22 @@
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  // interval-role color classes (shared tokens with the fretboard explorer):
-  // root / third-slot (3, b3, 2, 4) / fifth-slot (5, b5, #5)
+  // interval-role color classes — hue = function family:
+  // r = home (blue), 3 = identity (warm amber; incl. the sus 2/4 that
+  // replaces the third), 5 = safe landing (soft green; incl. altered 5ths —
+  // the label carries the alteration), 7 = added color (purple), n = neutral
+  // context. MUST stay content-identical with fretboard.js ROLE_CLASS
+  // (fb- prefix) — pinned by tests/run.js.
   var ROLE_CLASS = {
     'R': 'cd-r',
     '3': 'cd-3', 'b3': 'cd-3', '2': 'cd-3', '4': 'cd-3',
     '5': 'cd-5', 'b5': 'cd-5', '#5': 'cd-5',
-    'b7': 'cd-7', '7': 'cd-7', '6': 'cd-7'
+    'b7': 'cd-7', '7': 'cd-7', '6': 'cd-7', 'b6': 'cd-7'
   };
+  // passing/context tones never whisper-tint as ghosts — scale 2/4/6/b6
+  // read as terrain; as CHORD tones (sus2/sus4, 6-shells) they keep their
+  // family color
+  var CONTEXT_ROLES = { '2': 1, '4': 1, '6': 1, 'b6': 1 };
   function dispRole(r) { return String(r).replace('b', '♭').replace('#', '♯'); }
 
   /* shape: { frets:[6], fingers:[6]|null, baseFret, barre:{fret,from,to}|null }
@@ -53,14 +61,18 @@
     // fretted charts get identical grid widths (open charts just leave the
     // gutter empty) — no more narrow grids beside wide ones in a strip
     var padTop = label ? 15 : 4;      // room for the chord name
-    var markerRow = 9;                // open/mute markers
+    // role charts carry full-size LABELED dots on the open row — they need
+    // a deeper header than the classic charts' small X/ring markers
+    var markerRow = roles ? 13 : 9;
     var gridTop = padTop + markerRow;
     var padLeft = 13, padRight = 22;
     var gridW = W - padLeft - padRight;
     var gridH = H - gridTop - 8;
     var sx = gridW / (nStrings - 1);   // string spacing
     var fy = gridH / nFrets;           // fret spacing
-    var dotR = Math.min(sx, fy) * 0.36;
+    // role charts get slightly larger dots (the interval labels benefit);
+    // classic ink-and-finger charts keep their tuned size
+    var dotR = Math.min(sx, fy) * (roles ? 0.41 : 0.36);
 
     function X(s) { return padLeft + s * sx; }
     function fretY(f) { return gridTop + f * fy; } // f = 0..nFrets grid line
@@ -113,8 +125,9 @@
     for (var s2 = 0; s2 < nStrings; s2++) {
       var fr = frets[s2];
       var role = roles ? roles[s2] : null;
-      var roleCls = role ? ROLE_CLASS[role] || 'cd-3' : null;
-      var mx = X(s2), my = gridTop - 5;
+      var roleCls = role ? ROLE_CLASS[role] || 'cd-n' : null;
+      // marker row sits just clear of the nut (nut top = gridTop - 2.4)
+      var mx = X(s2), my = gridTop - 5.8;
       if (fr === -1) {
         var r = 2.6;
         out.push('<path d="M' + (mx - r) + ' ' + (my - r) + 'L' + (mx + r) + ' ' + (my + r) +
@@ -122,9 +135,15 @@
                  '" class="cd-mute" stroke-width="1.2" fill="none"/>');
       } else if (fr === 0) {
         if (roleCls) {
-          // an open string that sounds a chord tone: small filled role dot
-          out.push('<g class="' + roleCls + '"><circle cx="' + mx + '" cy="' + my +
-                   '" r="3.1" class="cd-dot"/></g>');
+          // an open string that sounds a chord tone: a full role dot with its
+          // interval label, rimmed and bottom-anchored just above the nut
+          var ocy = gridTop - 3.2 - dotR;
+          var orl = dispRole(role);
+          out.push('<g class="' + roleCls + ' cd-open-note">' +
+            '<circle cx="' + mx + '" cy="' + ocy + '" r="' + dotR + '" class="cd-dot"/>' +
+            '<text x="' + mx + '" y="' + (ocy + dotR * 0.48) +
+            '" text-anchor="middle" font-size="' + (dotR * (orl.length > 1 ? 0.95 : 1.25)) +
+            '" class="cd-role">' + esc(orl) + '</text></g>');
         } else {
           out.push('<circle cx="' + mx + '" cy="' + my + '" r="2.6" class="cd-open" ' +
                    'fill="none" stroke-width="1.1"/>');
@@ -177,9 +196,10 @@
     var nStrings = 6;
 
     var padTop = label ? 15 : 2;            // same name slot as chord charts
-    // open cards need headroom for the open-string dots; fretted cards get
-    // only a sliver — an empty reserved band reads as wasted padding
-    var markerRow = hasOpenRow ? 9 : 3;
+    // open cards need headroom for the LARGEST open dot (0.8 × dotR ≈ 4.8)
+    // plus the nut gap with real air above: 3.2 + 2×4.8 ≈ 12.8 → 13.
+    // Fretted cards keep the slim header.
+    var markerRow = hasOpenRow ? 13 : 3;
     var gridTop = padTop + markerRow;
     // uniform right gutter for the side fret tag — same grid WIDTH every card
     var padLeft = 13, padRight = 24;
@@ -226,11 +246,16 @@
       if (d.fret !== 0 && (d.fret < base || d.fret > endFret)) return;
       if (d.fret === 0 && !hasOpenRow) return;
       var cx = X(d.string);
-      var cy = d.fret === 0 ? gridTop - 5 : dotY(d.fret);
-      var cls = (ROLE_CLASS[d.role] || 'cd-3') + (d.ghost ? ' cd-ghost' : '');
+      var cls = (d.ghost && CONTEXT_ROLES[d.role]
+                  ? 'cd-n' : ROLE_CLASS[d.role] || 'cd-n') +
+                (d.ghost ? ' cd-ghost' : '') +
+                (d.fret === 0 ? ' cd-open-note' : '');
       // tonics read as markers, not targets: a notch under full size, still
       // clearly larger than the ghosted scale tones
-      var rr = d.ghost ? dotR * 0.62 : (d.fret === 0 ? 2.9 : dotR * 0.85);
+      var rr = d.ghost ? dotR * 0.67 : dotR * (d.fret === 0 ? 0.8 : 0.85);
+      // open dots sit with their bottom edge just clear of the nut bar
+      // (nut top = gridTop - 2.4), never overlapping it
+      var cy = d.fret === 0 ? gridTop - 3.2 - rr : dotY(d.fret);
       out.push('<g class="' + cls + '"><circle cx="' + cx + '" cy="' + cy +
                '" r="' + rr + '" class="cd-dot"/></g>');
     });
@@ -239,7 +264,8 @@
     return out.join('');
   }
 
-  var api = { renderChordSVG: renderChordSVG, renderScaleSVG: renderScaleSVG };
+  var api = { renderChordSVG: renderChordSVG, renderScaleSVG: renderScaleSVG,
+              ROLE_CLASS: ROLE_CLASS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.Diagrams = api;
 })(typeof window !== 'undefined' ? window : globalThis);
