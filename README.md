@@ -40,7 +40,7 @@ shape, with each note color-coded by interval role:
 
 > ● root (blue) · ● 3rd (amber) · ● 5th (green) · ● 7th/6th (violet)
 
-Two controls drive the strip:
+Three controls drive the strip:
 
 - **Position** — `Any` or one of the five CAGED positions of the song's key
   (`G·Open | E·3fr | D·5fr | C·7fr | A·10fr` in G). Pick one and *every chord*
@@ -48,12 +48,18 @@ Two controls drive the strip:
   leaving the position. When a chord has no strict in-window voicing, the
   engine widens by a fret and says so (`±1fr`), or flags a genuine position
   break (`off-pos`) — it never lies.
-- **Strings** — which adjacent string set to practice on (`1-3 | 2-4 | 3-5 | 4-6`),
-  or **Near**: a voice-leading chain where each triad is voiced *closest to the
-  previous chord's* — common tones stay put, the string set floats, and the whole
-  progression connects with minimal hand movement inside the position. Hold a
-  position and cycle the sets, hold a set and walk the positions, or switch to
-  Near and hear the chords melt into each other.
+- **Voicing** — `Closed` (three voices within an octave, adjacent strings) or
+  `Open`: spread triads with the middle voice raised an octave across a skipped
+  string — the big, ringing sound for comping in a band. The Strings selector
+  switches to the spread groupings (`1-3-4 | 2-4-5 | 3-5-6`) and everything
+  else — positions, Near, substitutions, practice mode — follows the family.
+- **Strings** — which string set to practice on (`1-3 | 2-4 | 3-5 | 4-6`, or the
+  spread groupings in Open mode), or **Near**: a voice-leading chain where each
+  triad is voiced *closest to the previous chord's* — common tones stay put, the
+  string set floats, and the whole progression connects with minimal hand
+  movement inside the position. Hold a position and cycle the sets, hold a set
+  and walk the positions, or switch to Near and hear the chords melt into each
+  other.
 
 Chords richer than a triad reduce honestly:
 
@@ -173,6 +179,6 @@ both `index.html` and `build.js` (the build fails loudly if they drift).
 node tests/run.js
 ```
 
-911 assertions across the parser, chord theory, voicing generator, triad/CAGED
+1023 assertions across the parser, chord theory, voicing generator, triad/CAGED
 engine (including hand-verified fret literals), substitution rule tables, and
 both SVG renderers. Pure Node — no browser or DOM required.

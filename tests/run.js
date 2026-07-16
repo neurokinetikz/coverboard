@@ -1000,6 +1000,84 @@ function deepEq(a, b, name) {
   deepEq(stMap.chords[1].byPosition.E.best.frets, [X, 7, 5, 5, X, X],
          'near byPosition: per-shape chain threads');
 
+  // --- open (spread) voicing family ---
+  // openOffsets = closed rotation with the middle voice raised an octave
+  // (R-5-3 / 3-R-5 / 5-3-R) on the three skip-string sets. All literals
+  // hand-derived from OPEN_MIDI arithmetic and verified against the engine.
+  function grabO(rootPc, q, setId, inv) {
+    return T.triadsFor(rootPc, q, { family: 'open' }).filter(function (v) {
+      return v.stringSet === setId && v.inversion === inv;
+    });
+  }
+  var closedRef = T.triadsFor(0, 'maj');
+  eq(closedRef.length, 16, 'closed default pool size unchanged');
+  var openPool = T.triadsFor(0, 'maj', { family: 'open' });
+  ok(T.triadsFor(0, 'maj') === closedRef, 'open generation does not touch the closed cache');
+  eq(openPool.length, 10, 'C maj open pool size');
+  deepEq(grabO(0, 'maj', '2-4-5', 0)[0].frets, [X, 3, 5, X, 5, X],
+         'canonical C spread: root position on A D B');
+  deepEq(grabO(0, 'maj', '2-4-5', 1)[0].frets, [X, 7, 10, X, 8, X], 'C spread 1st inv 2-4-5');
+  deepEq(grabO(0, 'maj', '2-4-5', 2)[0].frets, [X, 10, 14, X, 13, X], 'C spread 2nd inv 2-4-5');
+  deepEq(grabO(0, 'maj', '1-3-4', 0)[0].frets, [X, X, 10, 12, X, 12], 'C spread root 1-3-4');
+  deepEq(grabO(0, 'maj', '1-3-4', 1)[0].frets, [X, X, 2, 5, X, 3], 'C spread 1st inv 1-3-4');
+  deepEq(grabO(0, 'maj', '1-3-4', 2)[0].frets, [X, X, 5, 9, X, 8], 'C spread 2nd inv 1-3-4');
+  deepEq(grabO(0, 'maj', '3-5-6', 0)[0].frets, [8, 10, X, 9, X, X], 'C spread root 3-5-6');
+  eq(grabO(0, 'maj', '3-5-6', 1).length, 2, 'octave twins for the open-string grip');
+  deepEq(grabO(0, 'maj', '3-5-6', 1)[0].frets, [0, 3, X, 0, X, X], 'C spread 1st inv twin low');
+  deepEq(grabO(0, 'maj', '3-5-6', 1)[1].frets, [12, 15, X, 12, X, X], 'C spread 1st inv twin 12fr');
+  // family property test: right pcs, playable span, a genuine skipped string
+  openPool.forEach(function (v) {
+    var pcs = {};
+    for (var s = 0; s < 6; s++) {
+      if (v.frets[s] >= 0) pcs[(V.TUNING[s] + v.frets[s]) % 12] = 1;
+    }
+    deepEq(Object.keys(pcs).sort().join(','), '0,4,7', 'open C pcs ' + v.frets.join(','));
+    var fr = v.frets.filter(function (f) { return f >= 0; });
+    ok(Math.max.apply(null, fr) - Math.min.apply(null, fr) <= 4,
+       'open span ' + v.frets.join(','));
+    var idx = [];
+    for (var s2 = 0; s2 < 6; s2++) if (v.frets[s2] >= 0) idx.push(s2);
+    deepEq(idx, v.strings, 'sounding strings match the set triple');
+    ok(idx[2] - idx[0] === 3, 'spread grip skips a string');
+    eq(v.family, 'open', 'tagged open');
+    eq(v.barre, null, 'no phantom barre across the muted string');
+    ok(DG.renderChordSVG(v, { label: 'C', roles: null, showFingers: false })
+       .indexOf('<svg') === 0, 'open voicing renders ' + v.frets.join(','));
+  });
+  // span-guard culls (the honest gaps, mirroring the closed m7/maj7 culls)
+  eq(grabO(0, '7', '2-4-5', 0).length, 0, 'C7 spread R-b7-3 culled (span 5)');
+  ok(grabO(0, '7', '2-4-5', 1).length > 0, 'C7 spread 3-R-b7 survives');
+  eq(grabO(0, 'm7', '2-4-5', 1).length, 0, 'Cm7 spread 1st inv culled on 2-4-5');
+  ok(grabO(0, 'm7', '3-5-6', 1).length > 0, 'Cm7 spread 1st inv survives on 3-5-6');
+  eq(grabO(0, 'sus2', '2-4-5', 1).length, 0, 'sus2 spread 1st inv culled');
+  eq(T.triadsFor(0, '5', { family: 'open' }).length, 0,
+     'power chords have no spread form (no middle voice)');
+  // family-scoped pickers
+  deepEq(T.voicingAtPosition(0, 'maj', posC[3], { family: 'open' }).best.frets,
+         [8, 10, X, 9, X, X], 'open pick at E-shape of C = most central spread');
+  deepEq(T.voicingAtPosition(0, 'maj', posC[3],
+         { family: 'open', stringSetPref: '1-3-4' }).best.frets,
+         [X, X, 10, 12, X, 12], 'open set pref honored');
+  deepEq(T.voicingAtPosition(0, 'maj', posC[3],
+         { family: 'open', stringSetPref: '1-3' }).best.frets,
+         [8, 10, X, 9, X, X], 'closed id under open family sanitized (no NaN)');
+  deepEq(T.voicingAtPosition(7, 'maj', posG[1], { stringSetPref: '1-3-4' }).best.frets,
+         [X, 5, 5, 4, X, X], 'open id under closed family sanitized (no NaN)');
+  deepEq(T.voicingAnywhere(0, 'maj', { family: 'open' }).best.frets,
+         [X, X, 2, 5, X, 3], 'anywhere open defaults to the 1-3-4 low grip');
+  // near chain stays within the open family
+  var stO = T.songTriads(['C', 'G'],
+    { key: 'C', position: 'any', stringSetPref: 'near', family: 'open' });
+  deepEq(stO.chords[0].atPosition.best.frets, [0, 3, X, 0, X, X],
+         'open near: anchorless start near the nut');
+  deepEq(stO.chords[1].atPosition.best.frets, [3, 5, X, 4, X, X],
+         'open near: G nearest spread (dist 9)');
+  ok(stO.chords.every(function (c) { return c.atPosition.best.family === 'open'; }),
+     'near chain stays within the open family');
+  deepEq(T.songTriads(['C'], { key: 'C', position: 'any', family: 'open' })
+         .chords[0].atPosition.best.frets, [X, X, 2, 5, X, 3],
+         'songTriads threads the family');
+
   // --- per-song plumbing ---
   var st3 = T.songTriads(['G', 'C', 'D', 'Em']);
   eq(st3.key.name, 'G', 'key detected from chords');

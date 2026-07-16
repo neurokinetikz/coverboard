@@ -36,14 +36,24 @@
   };
 
   // String sets use guitarist numbering (1 = high e); `low` is the index of
-  // the set's lowest-pitch string in the frets[] array (low E = 0).
+  // the set's lowest-pitch string in the frets[] array (low E = 0), and
+  // `strings` lists the frets[] indices the three voices land on.
   var STRING_SETS = [
-    { id: '1-3', low: 3 },   // G B e
-    { id: '2-4', low: 2 },   // D G B
-    { id: '3-5', low: 1 },   // A D G
-    { id: '4-6', low: 0 }    // E A D
+    { id: '1-3', low: 3, strings: [3, 4, 5] },   // G B e
+    { id: '2-4', low: 2, strings: [2, 3, 4] },   // D G B
+    { id: '3-5', low: 1, strings: [1, 2, 3] },   // A D G
+    { id: '4-6', low: 0, strings: [0, 1, 2] }    // E A D
   ];
   var SET_INDEX = { '1-3': 0, '2-4': 1, '3-5': 2, '4-6': 3 };
+
+  // Open/spread family: bottom pair adjacent, top voice past a skipped
+  // string — the classic spread-triad sets (the skipped string mutes).
+  var OPEN_STRING_SETS = [
+    { id: '1-3-4', strings: [2, 3, 5] },   // D G e   (skip B)
+    { id: '2-4-5', strings: [1, 2, 4] },   // A D B   (skip G)
+    { id: '3-5-6', strings: [0, 1, 3] }    // E A G   (skip D)
+  ];
+  var OPEN_SET_INDEX = { '1-3-4': 0, '2-4-5': 1, '3-5-6': 2 };
 
   var ROLE_NAMES = {
     maj: { 0: 'R', 4: '3', 7: '5' },
@@ -186,13 +196,21 @@
     return o;
   }
 
-  function buildVoicing(rootPc, quality, set, inv, frets3) {
+  /* Spread voicing: the closed rotation with its middle voice raised an
+     octave — R-5-3 / 3-R-5 / 5-3-R. Still ascending: o[2] > o[0], and
+     o[1]+12 > o[2] because adjacent closed voices are always < 12 apart. */
+  function openOffsets(intervals, inv) {
+    var o = orderedOffsets(intervals, inv);
+    return [o[0], o[2], o[1] + 12];
+  }
+
+  function buildVoicing(rootPc, quality, set, inv, frets3, family) {
     var frets = [-1, -1, -1, -1, -1, -1];
     var notes = [];
     var minF = 99, maxF = 0, frettedMin = 99, frettedMax = 0;
     var rootString = -1;
     for (var k = 0; k < 3; k++) {
-      var s = set.low + k, f = frets3[k];
+      var s = set.strings[k], f = frets3[k];
       frets[s] = f;
       var midi = OPEN_MIDI[s] + f;
       var pc = midi % 12;
@@ -211,9 +229,12 @@
       frets: frets,
       fingers: null,
       baseFret: frettedMax <= 4 ? 1 : frettedMin,   // same rule as voicings.js
-      barre: V.detectBarre(frets),
+      // detectBarre would report a phantom barre across the muted middle
+      // string of a spread grip — spreads are never barred
+      barre: family === 'open' ? null : V.detectBarre(frets),
       stringSet: set.id,
-      strings: [set.low, set.low + 1, set.low + 2],
+      strings: set.strings.slice(),
+      family: family || 'close',
       inversion: inv,
       rootString: rootString,
       minFret: minF,
@@ -225,41 +246,54 @@
 
   var triadCache = {};
 
-  /* All closed-voice triads for rootPc+quality across the four adjacent
-     string sets and three inversions, frets 0..maxFret. opts.sets limits to
-     specific set ids. Power chords get the single ordering root-5th-octave. */
+  /* All triads for rootPc+quality: family 'close' (default) = closed voice
+     across the four adjacent string sets; family 'open' = spread voicings
+     (middle voice up an octave) across the three skip-string sets. Three
+     inversions each, frets 0..maxFret. opts.sets limits to specific set ids.
+     Power chords get the single closed ordering root-5th-octave and have no
+     spread form (no middle voice to displace). */
   function triadsFor(rootPc, quality, opts) {
     opts = opts || {};
     var maxFret = opts.maxFret || 15;
     var setIds = opts.sets || null;
+    var family = opts.family === 'open' ? 'open' : 'close';
     rootPc = ((rootPc % 12) + 12) % 12;
-    var cacheKey = rootPc + '|' + quality + '|' + maxFret;
+    var cacheKey = rootPc + '|' + quality + '|' + maxFret +
+      (family === 'open' ? '|open' : '');
     if (!setIds && triadCache[cacheKey]) return triadCache[cacheKey];
 
     var intervals = TRIAD_INTERVALS[quality];
     if (!intervals) return [];
-    var orderings = quality === '5'
-      ? [[0, 7, 12]]
-      : [0, 1, 2].map(function (inv) { return orderedOffsets(intervals, inv); });
+    var orderings;
+    if (family === 'open') {
+      orderings = intervals.length === 3
+        ? [0, 1, 2].map(function (inv) { return openOffsets(intervals, inv); })
+        : [];
+    } else {
+      orderings = quality === '5'
+        ? [[0, 7, 12]]
+        : [0, 1, 2].map(function (inv) { return orderedOffsets(intervals, inv); });
+    }
+    var sets = family === 'open' ? OPEN_STRING_SETS : STRING_SETS;
 
     var out = [];
-    STRING_SETS.forEach(function (set) {
+    sets.forEach(function (set) {
       if (setIds && setIds.indexOf(set.id) === -1) return;
       var setOut = [];
       orderings.forEach(function (off, inv) {
         var lowPc = (rootPc + off[0]) % 12;
         for (var fLow = 0; fLow <= maxFret; fLow++) {
-          var pLow = OPEN_MIDI[set.low] + fLow;
+          var pLow = OPEN_MIDI[set.strings[0]] + fLow;
           if (pLow % 12 !== lowPc) continue;
-          var fMid = pLow + (off[1] - off[0]) - OPEN_MIDI[set.low + 1];
-          var fHigh = pLow + (off[2] - off[0]) - OPEN_MIDI[set.low + 2];
+          var fMid = pLow + (off[1] - off[0]) - OPEN_MIDI[set.strings[1]];
+          var fHigh = pLow + (off[2] - off[0]) - OPEN_MIDI[set.strings[2]];
           if (fMid < 0 || fMid > maxFret || fHigh < 0 || fHigh > maxFret) continue;
           var span = Math.max(fLow, fMid, fHigh) - Math.min(fLow, fMid, fHigh);
           // playability cap: dim root position and the 7th-shell rotations
           // legitimately span 4; the m7/maj7 7th-in-bass rotations on the low
           // sets would span 5 and are culled here (the UI explains the gap)
           if (span > 4) continue;
-          setOut.push(buildVoicing(rootPc, quality, set, inv, [fLow, fMid, fHigh]));
+          setOut.push(buildVoicing(rootPc, quality, set, inv, [fLow, fMid, fHigh], family));
         }
       });
       setOut.sort(function (a, b) {
@@ -383,13 +417,15 @@
   function voicingAtPosition(rootPc, quality, position, opts) {
     opts = opts || {};
     var maxFret = opts.maxFret || 15;
-    var all = triadsFor(rootPc, quality, { maxFret: maxFret });
+    var family = opts.family === 'open' ? 'open' : 'close';
+    var setIdx = family === 'open' ? OPEN_SET_INDEX : SET_INDEX;
+    var all = triadsFor(rootPc, quality, { maxFret: maxFret, family: family });
     if (!all.length) return null;
     var anchor = opts.anchor || null;
-    // unknown ids (e.g. the app-level 'near' mode marker) must not reach
-    // SET_INDEX — a NaN score silently scrambles the sort
+    // ids unknown to THIS family (the 'near' marker, or the other family's
+    // set ids) must not reach the index — a NaN score scrambles the sort
     var pref = !anchor && opts.stringSetPref &&
-      SET_INDEX.hasOwnProperty(opts.stringSetPref) ? opts.stringSetPref : null;
+      setIdx.hasOwnProperty(opts.stringSetPref) ? opts.stringSetPref : null;
 
     function widen(extra) {
       return position.windows.map(function (w) {
@@ -431,7 +467,7 @@
       if (pref) {
         s += v.stringSet === pref
           ? 200
-          : -5 * Math.abs(SET_INDEX[v.stringSet] - SET_INDEX[pref]);
+          : -5 * Math.abs(setIdx[v.stringSet] - setIdx[pref]);
       }
       s -= 2 * Math.abs(centroid(v) - center);
       return s;
@@ -451,13 +487,16 @@
      a slash bass when one is asked for. */
   function voicingAnywhere(rootPc, quality, opts) {
     opts = opts || {};
-    var all = triadsFor(rootPc, quality, { maxFret: opts.maxFret || 15 });
+    var family = opts.family === 'open' ? 'open' : 'close';
+    var setIdx = family === 'open' ? OPEN_SET_INDEX : SET_INDEX;
+    var all = triadsFor(rootPc, quality,
+      { maxFret: opts.maxFret || 15, family: family });
     if (!all.length) return null;
     var anchor = opts.anchor || null;
     var near = !!opts.near || !!anchor;
     var pref = !near && opts.stringSetPref &&
-      SET_INDEX.hasOwnProperty(opts.stringSetPref) ? opts.stringSetPref
-      : near ? null : '1-3';
+      setIdx.hasOwnProperty(opts.stringSetPref) ? opts.stringSetPref
+      : near ? null : family === 'open' ? '1-3-4' : '1-3';
     var anchorSum = anchor ? sumMidi(anchor) : 0;
     function score(v) {
       var s = 0;
@@ -471,7 +510,7 @@
         // another set must not beat the preferred set's low voicing)
         s += v.stringSet === pref
           ? 0
-          : -8 * Math.abs(SET_INDEX[v.stringSet] - SET_INDEX[pref]);
+          : -8 * Math.abs(setIdx[v.stringSet] - setIdx[pref]);
       }
       return s - 2 * v.minFret - 0.5 * v.inversion;
     }
@@ -557,9 +596,11 @@
     }
 
     // 'near' is a mode, not a set id: voice-leading chain — each chord picks
-    // the voicing closest to the previous chord's, string set free to float
+    // the voicing closest to the previous chord's, string set free to float.
+    // The chain stays within the requested voicing family (pool is scoped).
     var near = opts.stringSetPref === 'near';
     var basePref = near ? null : (opts.stringSetPref || null);
+    var family = opts.family === 'open' ? 'open' : 'close';
     var prevBest = null;      // chain anchor ('any' and single-position paths)
     var prevByShape = {};     // independent chain per shape (byPosition path)
 
@@ -567,7 +608,8 @@
       var t = reduceTriad(e.parsed);
       t.rootName = CT.pcName(t.rootPc, preferFlat);
       t.label = t.rootName + TRIAD_SUFFIX[t.quality];
-      var vOpts = { stringSetPref: basePref, maxFret: maxFret, bassPc: t.bassPc };
+      var vOpts = { stringSetPref: basePref, maxFret: maxFret, bassPc: t.bassPc,
+                    family: family };
       var entry = { sym: e.sym, triad: t };
       if (opts.position === 'any') {
         if (near) { vOpts.near = true; vOpts.anchor = prevBest; }
@@ -580,7 +622,8 @@
       } else {
         entry.byPosition = {};
         positions.forEach(function (p) {
-          var po = { stringSetPref: basePref, maxFret: maxFret, bassPc: t.bassPc };
+          var po = { stringSetPref: basePref, maxFret: maxFret, bassPc: t.bassPc,
+                     family: family };
           if (near && prevByShape[p.shape]) po.anchor = prevByShape[p.shape];
           var pk = voicingAtPosition(t.rootPc, t.quality, p, po);
           entry.byPosition[p.shape] = pk;
@@ -588,7 +631,8 @@
         });
       }
       if (opts.includeAllVoicings) {
-        entry.voicings = triadsFor(t.rootPc, t.quality, { maxFret: maxFret }).map(function (v) {
+        entry.voicings = triadsFor(t.rootPc, t.quality,
+            { maxFret: maxFret, family: family }).map(function (v) {
           var copy = {};
           for (var k in v) if (v.hasOwnProperty(k)) copy[k] = v[k];
           copy.positions = assignPositions(v, positions);
@@ -646,6 +690,7 @@
     OPEN_MIDI: OPEN_MIDI,
     TRIAD_INTERVALS: TRIAD_INTERVALS,
     TRIAD_SUFFIX: TRIAD_SUFFIX,
+    OPEN_STRING_SETS: OPEN_STRING_SETS,
     STRING_SETS: STRING_SETS,
     reduceTriad: reduceTriad,
     triadsFor: triadsFor,

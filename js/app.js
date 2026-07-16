@@ -217,12 +217,22 @@
   }
 
   var TRIAD_SET_IDS = ['1-3', '2-4', '3-5', '4-6'];
+  var TRIAD_OPEN_SET_IDS = ['1-3-4', '2-4-5', '3-5-6'];
+  function triadVoicingPref() {
+    return Store.getSettings().triadVoicing === 'open' ? 'open' : 'close';
+  }
+  function triadSetIds() {
+    return triadVoicingPref() === 'open' ? TRIAD_OPEN_SET_IDS : TRIAD_SET_IDS;
+  }
   // 'near' = voice-leading chain: each triad voiced closest to the previous
-  // chord's, string set free to float (the engine treats it as a mode)
-  var TRIAD_STRING_MODES = TRIAD_SET_IDS.concat(['near']);
+  // chord's, string set free to float (the engine treats it as a mode).
+  // A set id from the OTHER family resolves to this family's first id
+  // WITHOUT rewriting the store — Close→Open→Close restores the selection.
   function triadStringsPref() {
     var v = Store.getSettings().triadStrings;
-    return TRIAD_STRING_MODES.indexOf(v) !== -1 ? v : '1-3';
+    if (v === 'near') return 'near';
+    var ids = triadSetIds();
+    return ids.indexOf(v) !== -1 ? v : ids[0];
   }
 
   /* Per-string interval roles for a triad voicing -> diagrams.js opts.roles */
@@ -266,10 +276,12 @@
     // falls to adjacent sets only when the chosen set has nothing in position.
     // 'near' instead chains each triad closest to the previous chord's.
     var setPref = triadStringsPref();
+    var fam = triadVoicingPref();
     var result = TR.songTriads(disp, {
       key: key || undefined,
       position: pos === 'any' ? 'any' : parseInt(pos, 10),
-      stringSetPref: setPref
+      stringSetPref: setPref,
+      family: fam
     });
 
     var has7 = result.chords.some(function (c) {
@@ -299,8 +311,16 @@
     } else {
       out.push('<button class="chip" data-act="key-menu">Set the song key to enable positions</button>');
     }
+    out.push('<span class="ts-sub">Voicing</span><span class="pos-seg">');
+    out.push('<button class="mini' + (fam === 'close' ? ' active' : '') +
+      '" data-act="triad-voicing" data-v="close" ' +
+      'title="Closed triads — three voices within an octave on adjacent strings">Closed</button>');
+    out.push('<button class="mini' + (fam === 'open' ? ' active' : '') +
+      '" data-act="triad-voicing" data-v="open" ' +
+      'title="Spread triads — middle voice up an octave across a skipped string">Open</button>');
+    out.push('</span>');
     out.push('<span class="ts-sub">Strings</span><span class="pos-seg">');
-    TRIAD_SET_IDS.forEach(function (id) {
+    triadSetIds().forEach(function (id) {
       out.push('<button class="mini' + (setPref === id ? ' active' : '') +
         '" data-act="triad-strings" data-v="' + id + '" title="Play triads on strings ' +
         id + '">' + id + '</button>');
@@ -1107,6 +1127,7 @@
     // voicings[idx] never depends on HOW the user reached idx (rail jumps,
     // back-steps, wraps all land on identical picks). triadsFor is cached —
     // one filter+sort per link.
+    var fam = triadVoicingPref();
     var chain = null;
     if (setPref === 'near') {
       chain = [];
@@ -1114,7 +1135,8 @@
       for (var ci = 0; ci < len; ci++) {
         var ct = TR.reduceTriad(ctx.seq[ci].sym);
         var cpk = ct ? TR.voicingAtPosition(ct.rootPc, ct.quality, p,
-          prevV ? { anchor: prevV, bassPc: ct.bassPc } : { bassPc: ct.bassPc }) : null;
+          prevV ? { anchor: prevV, bassPc: ct.bassPc, family: fam }
+                : { bassPc: ct.bassPc, family: fam }) : null;
         chain.push(cpk);
         if (cpk && cpk.best) prevV = cpk.best;
       }
@@ -1125,7 +1147,7 @@
     var t = TR.reduceTriad(cur.sym);
     var pick = chain ? chain[pr.idx]
       : t ? TR.voicingAtPosition(t.rootPc, t.quality, p,
-          { stringSetPref: setPref, bassPc: t.bassPc }) : null;
+          { stringSetPref: setPref, bassPc: t.bassPc, family: fam }) : null;
     var v = pick && pick.best;
     if (v) {
       v.notes.forEach(function (n) {
@@ -1140,7 +1162,7 @@
     var nt = nxt ? TR.reduceTriad(nxt.sym) : null;
     var npick = chain ? (nxt ? chain[(pr.idx + 1) % len] : null)
       : nt ? TR.voicingAtPosition(nt.rootPc, nt.quality, p,
-          { stringSetPref: setPref, bassPc: nt.bassPc }) : null;
+          { stringSetPref: setPref, bassPc: nt.bassPc, family: fam }) : null;
     if (npick && npick.best) {
       npick.best.notes.forEach(function (n) {
         var k = n.string + ':' + n.fret;
@@ -1177,8 +1199,13 @@
         '" data-act="triad-pos" data-v="' + pp.index + '">' +
         esc(triadPosLabel(pp)) + '</button>');
     });
+    out.push('</span><span class="ts-sub">Voicing</span><span class="pos-seg">');
+    out.push('<button class="mini' + (fam === 'close' ? ' active' : '') +
+      '" data-act="triad-voicing" data-v="close">Closed</button>');
+    out.push('<button class="mini' + (fam === 'open' ? ' active' : '') +
+      '" data-act="triad-voicing" data-v="open">Open</button>');
     out.push('</span><span class="ts-sub">Strings</span><span class="pos-seg">');
-    TRIAD_SET_IDS.forEach(function (id) {
+    triadSetIds().forEach(function (id) {
       out.push('<button class="mini' + (setPref === id ? ' active' : '') +
         '" data-act="triad-strings" data-v="' + id + '">' + id + '</button>');
     });
@@ -1462,11 +1489,15 @@
     return { window: w, windows: [w] };
   }
 
+  /* Closed set id from a frets array — null unless it is a genuine adjacent
+     triple (a spread grip must not get mislabeled as a closed set). */
   function stringSetOfFrets(frets) {
+    var idx = [];
     for (var s = 0; s < 6; s++) {
-      if (frets[s] >= 0) return { 3: '1-3', 2: '2-4', 1: '3-5', 0: '4-6' }[s] || '1-3';
+      if (frets[s] >= 0) idx.push(s);
     }
-    return '1-3';
+    if (idx.length !== 3 || idx[2] - idx[0] !== 2) return null;
+    return { 3: '1-3', 2: '2-4', 1: '3-5', 0: '4-6' }[idx[0]] || null;
   }
 
   /* anchor for a clicked triad chart: the strip's selected position, or an
@@ -1477,11 +1508,13 @@
       var ex = getExplorer();
       var setPref = ex.stringSet !== 'all' && FB_SETS[ex.stringSet]
         ? FB_SETS[ex.stringSet].id
-        : (frets ? stringSetOfFrets(frets) : '1-3');
+        : (frets && stringSetOfFrets(frets)) || '1-3';
+      // the explorer browses closed voicings only (fb-strings is closed-family)
       return { position: frets ? adhocWindow(frets) : null,
-               posLabel: '', stringSetPref: setPref };
+               posLabel: '', stringSetPref: setPref, family: 'close' };
     }
     var setPref2 = triadStringsPref();
+    var fam = triadVoicingPref();
     var song = App.state.songId ? Store.getSong(App.state.songId) : null;
     var pos = String(settings.triadPos || 'any');
     if (song && pos !== 'any') {
@@ -1490,12 +1523,13 @@
       if (key) {
         var p = TR.positionsForKey(key.pc, key.minor)[parseInt(pos, 10) - 1];
         if (p) {
-          return { position: p, posLabel: triadPosLabel(p), stringSetPref: setPref2 };
+          return { position: p, posLabel: triadPosLabel(p),
+                   stringSetPref: setPref2, family: fam };
         }
       }
     }
     return { position: frets ? adhocWindow(frets) : null,
-             posLabel: '', stringSetPref: setPref2 };
+             posLabel: '', stringSetPref: setPref2, family: fam };
   }
 
   function subsModal(sym, anchor, opts) {
@@ -1510,11 +1544,14 @@
     var topHtml = null, topFrets = null, voicings = null, idx = 0;
     if (anchor.kind === 'triad' && TR) {
       var t = TR.reduceTriad(sym);
+      var aFam = anchor.family === 'open' ? 'open' : 'close';
       var v = null;
       if (t) {
         if (anchor.frets) {
           var fkey = anchor.frets.join(',');
-          v = TR.triadsFor(t.rootPc, t.quality).filter(function (x) {
+          // search the anchor's own family pool — a spread grip only exists
+          // in the open pool
+          v = TR.triadsFor(t.rootPc, t.quality, { family: aFam }).filter(function (x) {
             return x.frets.join(',') === fkey;
           })[0] || null;
         }
@@ -1524,9 +1561,10 @@
           var nearTop = anchor.stringSetPref === 'near';
           var pk0 = anchor.position
             ? TR.voicingAtPosition(t.rootPc, t.quality, anchor.position,
-                { stringSetPref: nearTop ? null : anchor.stringSetPref })
+                { stringSetPref: nearTop ? null : anchor.stringSetPref, family: aFam })
             : TR.voicingAnywhere(t.rootPc, t.quality,
-                { stringSetPref: nearTop ? null : anchor.stringSetPref, near: nearTop });
+                { stringSetPref: nearTop ? null : anchor.stringSetPref,
+                  near: nearTop, family: aFam });
           v = pk0 && pk0.best;
         }
       }
@@ -1564,6 +1602,7 @@
         var so = nearSub
           ? { anchor: { frets: topFrets }, bassPc: st.bassPc }
           : { stringSetPref: anchor.stringSetPref, bassPc: st.bassPc };
+        so.family = anchor.family === 'open' ? 'open' : 'close';
         if (nearSub && !anchor.position) so.near = true;
         var pk = anchor.position
           ? TR.voicingAtPosition(st.rootPc, st.quality, anchor.position, so)
@@ -1662,7 +1701,7 @@
             frets: anchor.kind === 'chord' ? topFrets
               : sif ? sif.split(',').map(Number) : null,
             position: anchor.position, posLabel: anchor.posLabel,
-            stringSetPref: anchor.stringSetPref },
+            stringSetPref: anchor.stringSetPref, family: anchor.family },
           { ctx: ctx, stack: stack.concat([{ sym: sym, frets: topFrets }]) });
         return;
       }
@@ -1670,7 +1709,8 @@
         var prev = stack[stack.length - 1];
         subsModal(prev.sym,
           { kind: anchor.kind, frets: prev.frets, position: anchor.position,
-            posLabel: anchor.posLabel, stringSetPref: anchor.stringSetPref },
+            posLabel: anchor.posLabel, stringSetPref: anchor.stringSetPref,
+            family: anchor.family },
           { ctx: ctx, stack: stack.slice(0, -1) });
       }
     });
@@ -1966,7 +2006,8 @@
       var ta = triadAnchorFor(tf);
       subsModal(tsym,
         { kind: 'triad', frets: tf, position: ta.position,
-          posLabel: ta.posLabel, stringSetPref: ta.stringSetPref },
+          posLabel: ta.posLabel, stringSetPref: ta.stringSetPref,
+          family: ta.family },
         { ctx: chordCtx(tsym) });
       return;
     }
@@ -2051,6 +2092,10 @@
         break;
       case 'triad-strings':
         Store.setSetting('triadStrings', actEl.getAttribute('data-v'));
+        if (st.view === 'practice') updatePractice(); else updateTriadStrip();
+        break;
+      case 'triad-voicing':
+        Store.setSetting('triadVoicing', actEl.getAttribute('data-v'));
         if (st.view === 'practice') updatePractice(); else updateTriadStrip();
         break;
       case 'view-practice':
