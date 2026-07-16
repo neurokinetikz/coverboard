@@ -426,6 +426,12 @@
     if (!TR || !parsed.chords.length) return '';
     var key = songScaleKey(song, parsed, tr, flat);
     if (!key) return '';
+    // collapsed: a slim rail on the right edge — click anywhere to reopen
+    if (Store.getSettings().scalesCollapsed) {
+      return '<div class="scale-col collapsed" id="scale-col" data-act="toggle-scales" ' +
+        'title="Show pentatonics" role="button">' +
+        '<span class="sc-rail-lab">« Pentatonics</span></div>';
+    }
     var preferFlat = CT.keyPrefersFlat(key.pc, key.minor);
     var tonic = CT.pcName(key.pc, preferFlat);
     var primaryTitle = tonic + (key.minor ? 'm' : '');
@@ -456,7 +462,9 @@
         : '<span class="ts-scale sc-blank"></span>');
     });
     return '<div class="scale-col" id="scale-col">' +
-      '<div class="ts-zone-head"><span class="ts-lab">Pentatonics</span></div>' +
+      '<div class="ts-zone-head"><span class="ts-lab">Pentatonics</span>' +
+      '<button class="icon sc-collapse" data-act="toggle-scales" ' +
+      'title="Hide pentatonics">»</button></div>' +
       '<div class="sc-names"><span class="sc-name">' + esc(primaryTitle) +
         '</span><span class="sc-name">' + esc(parallelTitle) + '</span></div>' +
       '<div class="sc-grid">' +
@@ -2095,6 +2103,11 @@
       case 'triad-voicing':
         Store.setSetting('triadVoicing', actEl.getAttribute('data-v'));
         if (st.view === 'practice') updatePractice(); else updateTriadStrip();
+        break;
+      case 'toggle-scales':
+        Store.setSetting('scalesCollapsed', !Store.getSettings().scalesCollapsed);
+        updateScaleCol();
+        scheduleFit();   // lyrics width changed — refit the columns
         break;
       case 'view-practice':
         App.state.practice = { idx: 0 };

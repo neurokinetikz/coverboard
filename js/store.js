@@ -46,7 +46,8 @@
         triadPos: 'any',       // triad strip CAGED position ('any' | '1'..'5')
         triadStrings: '1-3',   // triad strip string set ('1-3'|'2-4'|'3-5'|'4-6'|'near', or open ids '1-3-4'|'2-4-5'|'3-5-6')
         triadVoicing: 'close', // triad voicing family: 'close' (adjacent strings) | 'open' (spread, skipped string)
-        sidebarCollapsed: false // desktop: hide the library panel
+        sidebarCollapsed: false, // desktop: hide the library panel
+        scalesCollapsed: false   // collapse the pentatonics column to a slim rail
       }
     };
   }

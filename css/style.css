@@ -551,8 +551,26 @@ pre.tabline {
   padding: 8px 12px 10px; border-left: 1px solid var(--border);
   overflow: hidden;
 }
-.scale-col .ts-zone-head { flex: 0 0 auto; padding-bottom: 1px; }
+.scale-col .ts-zone-head { flex: 0 0 auto; padding-bottom: 1px; position: relative; }
 .scale-col .ts-zone-head .ts-lab { font-size: 14px; letter-spacing: 1px; }
+.sc-collapse {
+  position: absolute; right: -6px; top: -4px;
+  font-size: 13px; padding: 2px 7px; color: var(--text-dim);
+  background: none; border: none;
+}
+.sc-collapse:hover { color: var(--text); border: none; }
+/* collapsed: a slim clickable rail hugging the right edge */
+.scale-col.collapsed {
+  flex: 0 0 26px; padding: 12px 0; cursor: pointer;
+  align-items: center; justify-content: flex-start;
+}
+.scale-col.collapsed:hover { background: var(--bg-inset); }
+.sc-rail-lab {
+  writing-mode: vertical-rl;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.2px; color: var(--text-dim); white-space: nowrap;
+}
+.scale-col.collapsed:hover .sc-rail-lab { color: var(--text); }
 .ts-zone-head { display: flex; align-items: center; justify-content: center; }
 /* two flavor sub-columns; rows align because both stacks share the same
    header height and equal-flex cards. flex bases are 0 (not auto) so the
