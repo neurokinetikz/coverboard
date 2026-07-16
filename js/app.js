@@ -181,7 +181,9 @@
   function diagramStripHTML(parsed, tr, flat, song) {
     if (!parsed.chords.length) return '';
     var settings = Store.getSettings();
-    var seen = {}, out = ['<div class="diagram-strip">'];
+    var seen = {}, out = ['<div class="diagram-strip">' +
+      '<button class="icon strip-collapse" data-act="toggle-strip" ' +
+      'title="Collapse the chord charts">⌃</button>'];
     parsed.chords.forEach(function (sym) {
       var d = dispChord(sym, tr, flat);
       var p = CT.parseChord(d);
@@ -292,7 +294,9 @@
       return c.triad.quality === '6' || c.triad.quality === 'm6';
     });
     var extraLabel = has7 && has6 ? '7th·6th' : has7 ? '7th' : has6 ? '6th' : '';
-    var out = ['<div class="triad-strip" id="triad-strip">'];
+    var out = ['<div class="triad-strip" id="triad-strip">' +
+      '<button class="icon strip-collapse" data-act="toggle-strip" ' +
+      'title="Collapse the chord charts">⌃</button>'];
     out.push('<div class="ts-head">' +
       (result.key
         ? '<span class="ts-lab">Key</span><span class="sub-key">' + esc(result.key.name) + '</span>'
@@ -374,26 +378,54 @@
     return out.join('');
   }
 
-  /* one pentatonic-box card: pc+minor pick the flavor, position picks the box.
-     Titles are chord-style ("E", "Em") — the zone header says "pentatonics" */
-  function scaleCardHTML(pc, minorFlavor, title, position, preferFlat, active) {
-    var box = TR.pentBoxDots(pc, minorFlavor, position);
+  // the two parallel stacks per selector kind: [minor-flavor id, major-flavor id]
+  var SCALE_KINDS = {
+    pent:  ['minPent', 'majPent'],
+    full:  ['minor', 'major'],
+    modes: ['dorian', 'mixo']
+  };
+  var SCALE_KIND_NAMES = { pent: 'Pentatonic', full: 'Full scale', modes: 'Mixolydian · Dorian' };
+  // stack titles: plain tonic names for pent/full, mode names for modes
+  function scaleStackTitle(tonic, scaleId) {
+    if (scaleId === 'dorian') return tonic + ' Dorian';
+    if (scaleId === 'mixo') return tonic + ' Mixolydian';
+    return scaleId === 'minPent' || scaleId === 'minor' ? tonic + 'm' : tonic;
+  }
+  function scalesKindPref() {
+    var v = Store.getSettings().scalesKind;
+    return SCALE_KINDS[v] ? v : 'pent';
+  }
+  function scaleBoxFor(pc, scaleId, position) {
+    // pent keeps its dedicated box builder (exactly-2-per-string invariant);
+    // everything else windows the scale to the same per-shape spans
+    return scaleId === 'minPent' || scaleId === 'majPent'
+      ? TR.pentBoxDots(pc, scaleId === 'minPent', position)
+      : TR.scaleBoxDots(pc, scaleId, position);
+  }
+
+  /* one scale-box card: pc+scaleId pick the flavor, position picks the box.
+     Titles are chord-style ("E", "Em") — the zone header names the kind */
+  function scaleCardHTML(pc, scaleId, title, position, preferFlat, active) {
+    var box = scaleBoxFor(pc, scaleId, position);
     var scDots = box.dots.map(function (n) {
       return n.interval === 0
         ? { string: n.string, fret: n.fret, role: 'R' }
         : { string: n.string, fret: n.fret, role: n.role, ghost: true };
     });
     scDots.sort(function (a, b) { return (b.ghost ? 1 : 0) - (a.ghost ? 1 : 0); });
+    var minorFlavor = scaleId === 'minPent' || scaleId === 'minor' || scaleId === 'dorian';
+    var scaleName = TR.SCALES[scaleId] ? TR.SCALES[scaleId].name : 'scale';
+    var exScale = scaleId === 'minor' || scaleId === 'major' ? 'full' : 'pent';
     return '<span class="ts-scale' + (active ? ' active' : '') +
       '" data-act="view-fretboard" data-root="' +
       pc + '" data-quality="' + (minorFlavor ? 'min' : 'maj') +
-      '" data-scale="pent" data-spell="' + (preferFlat ? 'flat' : 'sharp') +
-      '" title="' + esc(title + ' pentatonic in this position — tap to explore') + '">' +
+      '" data-scale="' + exScale + '" data-spell="' + (preferFlat ? 'flat' : 'sharp') +
+      '" title="' + esc(title + ' ' + scaleName + ' in this position — tap to explore') + '">' +
       // no per-card name — the flavor is named once at the top of its column
       '<span class="ts-neck">' + DG.renderScaleSVG({
         startFret: box.lo, endFret: box.hi, dots: scDots,
         width: 104, height: 96,
-        ariaLabel: title + ' pentatonic, ' +
+        ariaLabel: title + ' ' + scaleName + ', ' +
           (box.lo === 0 ? 'open position' : 'frets ' + box.lo + '-' + box.hi)
       }) + '</span>' +
       // just the shape — the chart itself carries the fret tag
@@ -429,42 +461,51 @@
     // collapsed: a slim rail on the right edge — click anywhere to reopen
     if (Store.getSettings().scalesCollapsed) {
       return '<div class="scale-col collapsed" id="scale-col" data-act="toggle-scales" ' +
-        'title="Show pentatonics" role="button">' +
-        '<span class="sc-rail-lab">« Pentatonics</span></div>';
+        'title="Show scales" role="button">' +
+        '<span class="sc-rail-caret">«</span><span class="sc-rail-lab">Scales</span></div>';
     }
     var preferFlat = CT.keyPrefersFlat(key.pc, key.minor);
     var tonic = CT.pcName(key.pc, preferFlat);
-    var primaryTitle = tonic + (key.minor ? 'm' : '');
-    var parallelTitle = tonic + (key.minor ? '' : 'm');
     var settings = Store.getSettings();
     var selIndex = settings.showTriads && String(settings.triadPos || 'any') !== 'any'
       ? parseInt(settings.triadPos, 10) : 0;
     var positions = TR.positionsForKey(key.pc, key.minor);
     var parPositions = TR.positionsForKey(key.pc, !key.minor);
 
+    // the selector kind picks the scale pair; the key's flavor is primary
+    var kind = scalesKindPref();
+    var ids = SCALE_KINDS[kind];
+    var primId = key.minor ? ids[0] : ids[1];
+    var parId = key.minor ? ids[1] : ids[0];
+    var primaryTitle = scaleStackTitle(tonic, primId);
+    var parallelTitle = scaleStackTitle(tonic, parId);
+
     // two flavor sub-columns (key's own + parallel), each named ONCE at the
     // top; card rows align because both stacks share the same equal-flex rows
     var prim = [], par = [];
     positions.forEach(function (sp) {
-      prim.push(scaleCardHTML(key.pc, key.minor, primaryTitle, sp, preferFlat,
+      prim.push(scaleCardHTML(key.pc, primId, primaryTitle, sp, preferFlat,
         sp.index === selIndex));
       // the parallel flavor's box nearest this row's neck region
-      var primaryBox = TR.pentBoxDots(key.pc, key.minor, sp);
+      var primaryBox = scaleBoxFor(key.pc, primId, sp);
       var center = (primaryBox.lo + primaryBox.hi) / 2;
       var parallelPos = null, bd = Infinity;
       parPositions.forEach(function (p) {
-        var b = TR.pentBoxDots(key.pc, !key.minor, p);
+        var b = scaleBoxFor(key.pc, parId, p);
         var d = Math.abs((b.lo + b.hi) / 2 - center);
         if (d < bd) { bd = d; parallelPos = p; }
       });
       par.push(parallelPos
-        ? scaleCardHTML(key.pc, !key.minor, parallelTitle, parallelPos, preferFlat, false)
+        ? scaleCardHTML(key.pc, parId, parallelTitle, parallelPos, preferFlat, false)
         : '<span class="ts-scale sc-blank"></span>');
     });
     return '<div class="scale-col" id="scale-col">' +
-      '<div class="ts-zone-head"><span class="ts-lab">Pentatonics</span>' +
+      '<div class="ts-zone-head">' +
+      '<span class="ts-lab">Scales:</span>' +
+      '<button class="sc-kind-btn" data-act="scales-kind-menu" ' +
+      'title="Choose the scale — click to change">' + esc(SCALE_KIND_NAMES[kind]) + '</button>' +
       '<button class="icon sc-collapse" data-act="toggle-scales" ' +
-      'title="Hide pentatonics">»</button></div>' +
+      'title="Hide scales">›</button></div>' +
       '<div class="sc-names"><span class="sc-name">' + esc(primaryTitle) +
         '</span><span class="sc-name">' + esc(parallelTitle) + '</span></div>' +
       '<div class="sc-grid">' +
@@ -778,8 +819,13 @@
       '<button data-act="delete-song" class="icon danger" title="Delete">🗑</button>' +
       '</div></div>' +
       // strip = full-width pinned header; below it lyrics + the scales
-      // column share the remaining height
-      (settings.showTriads ? triadStripHTML(parsed, tr, flat, song)
+      // column share the remaining height. Collapsed: a slim rail at the top.
+      (settings.stripCollapsed && (settings.showTriads || settings.showDiagrams)
+        ? '<div class="strip-rail" data-act="toggle-strip" role="button" ' +
+          'title="Show the chord charts">' +
+          (settings.showTriads ? 'Triads' : 'Chords') +
+          '<span class="rail-caret">«</span></div>'
+        : settings.showTriads ? triadStripHTML(parsed, tr, flat, song)
         : settings.showDiagrams ? diagramStripHTML(parsed, tr, flat, song) : '') +
       '<div class="song-cols">' +
       '<div class="song-scroll' + (fit ? ' fit' : '') + '" id="song-scroll"><div class="song-body">' +
@@ -1851,6 +1897,46 @@
     if (m) m.remove();
   }
 
+  function closeScalesMenu() {
+    var m = $('#scales-menu');
+    if (m) m.remove();
+  }
+
+  /* scale-kind popup — same interaction as the key selector */
+  function openScalesMenu(anchor) {
+    closeScalesMenu();
+    var cur = scalesKindPref();
+    var menu = document.createElement('div');
+    menu.id = 'scales-menu';
+    menu.className = 'key-menu sc-menu';
+    var html = '<div class="km-title">Show scale…</div><div class="km-grid">';
+    ['pent', 'full', 'modes'].forEach(function (k) {
+      html += '<button data-v="' + k + '" class="km-key' + (k === cur ? ' cur' : '') + '">' +
+        esc(SCALE_KIND_NAMES[k]) + '</button>';
+    });
+    html += '</div>';
+    menu.innerHTML = html;
+    menu.addEventListener('click', function (e) {
+      var b = e.target.closest('.km-key');
+      if (!b) return;
+      Store.setSetting('scalesKind', b.getAttribute('data-v'));
+      closeScalesMenu();
+      updateScaleCol();
+    });
+    document.body.appendChild(menu);
+    var r = anchor.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+    menu.style.top = (r.bottom + 6) + 'px';
+    setTimeout(function () {
+      document.addEventListener('mousedown', function dismiss(e) {
+        if (e.target.closest('#scales-menu') ||
+            e.target.closest('[data-act="scales-kind-menu"]')) return;
+        closeScalesMenu();
+        document.removeEventListener('mousedown', dismiss);
+      });
+    }, 0);
+  }
+
   function openKeyMenu(anchor) {
     closeKeyMenu();
     var song = Store.getSong(App.state.songId);
@@ -2108,6 +2194,15 @@
         Store.setSetting('scalesCollapsed', !Store.getSettings().scalesCollapsed);
         updateScaleCol();
         scheduleFit();   // lyrics width changed — refit the columns
+        break;
+      case 'toggle-strip':
+        Store.setSetting('stripCollapsed', !Store.getSettings().stripCollapsed);
+        render();
+        scheduleFit();   // lyrics height changed — refit the columns
+        break;
+      case 'scales-kind-menu':
+        if ($('#scales-menu')) closeScalesMenu();
+        else openScalesMenu(actEl);
         break;
       case 'view-practice':
         App.state.practice = { idx: 0 };

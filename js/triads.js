@@ -122,6 +122,25 @@
     return { lo: lo, hi: hi, dots: dots };
   }
 
+  /* any scale windowed to the same per-shape pattern box as the pentatonics
+     (all in-scale tones in the span — full scales get 3 per string where the
+     scale has them). Open fallback: the box height anchored at the nut. */
+  function scaleBoxDots(rootPc, scaleId, position) {
+    var map = scaleMap(rootPc, scaleId, { maxFret: 17 });
+    var span = PENT_BOX_SPAN[position.shape] || [0, 4];
+    var lo = position.frame + span[0], hi = position.frame + span[1];
+    if (lo < 0) { hi = span[1] - span[0]; lo = 0; }
+    var dots = [];
+    map.strings.forEach(function (arr, s) {
+      arr.forEach(function (n) {
+        if (n.fret >= lo && n.fret <= hi) {
+          dots.push({ string: s, fret: n.fret, interval: n.interval, role: n.role });
+        }
+      });
+    });
+    return { lo: lo, hi: hi, dots: dots };
+  }
+
   /* which scale fits a chord quality — chord-correct, not key-approximate:
      dominant 7ths get Mixolydian, m6 gets Dorian */
   function scaleForQuality(quality, kind) {
@@ -703,6 +722,7 @@
     SCALES: SCALES,
     PENT_BOX_SPAN: PENT_BOX_SPAN,
     pentBoxDots: pentBoxDots,
+    scaleBoxDots: scaleBoxDots,
     scaleMap: scaleMap,
     scaleForQuality: scaleForQuality
   };

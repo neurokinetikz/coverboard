@@ -89,12 +89,17 @@ buttons — tapping `F♯` vs `G♭` spells everything accordingly) and any qual
 - an optional **CAGED overlay** shading the five position windows
 - the discrete voicing charts below the neck — tap any to open substitutions
 
-And in the song view: a **pentatonics column** pins to the right edge — all
-five CAGED positions, nut first, in two stacks (the key's pentatonic and its
-parallel flavor, each named once at the top). Tonics in root-blue, captions
-like `E shape · 5fr`, the selected triad position highlighted, and the cards
-grow with your screen. Tap any card to open the explorer with everything
-pre-set.
+And in the song view: a **scales column** pins to the right edge — all five
+CAGED positions, nut first, in two stacks (the key's flavor and its parallel,
+each named once at the top). A key-style selector picks the scale:
+**Pentatonic** (the classic boxes), **Full scale** (the 7-note
+major/natural-minor CAGED patterns), or **Mixolydian · Dorian** (the modal
+workhorses — Mixolydian over major/dominant vamps, Dorian over minor).
+Tonics in root-blue, the selected
+triad position highlighted, cards grow with your screen, and the whole column
+collapses to a slim rail when you want the width back — and the chart strip
+itself collapses to a matching rail at the top. Tap any card to open the
+explorer with everything pre-set.
 
 ## Learn: practice mode
 

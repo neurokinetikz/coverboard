@@ -1078,6 +1078,32 @@ function deepEq(a, b, name) {
          .chords[0].atPosition.best.frets, [X, X, 2, 5, X, 3],
          'songTriads threads the family');
 
+  // --- scale-kind boxes (full scales windowed to the pentatonic spans) ---
+  var dotKey = function (d) { return d.string + ':' + d.fret; };
+  for (var bk = 0; bk < 12; bk++) {
+    T.positionsForKey(bk, true).forEach(function (p) {
+      var pent = T.pentBoxDots(bk, true, p);
+      if (p.frame + (T.PENT_BOX_SPAN[p.shape] || [0])[0] < 0) return; // open fallback differs by design
+      var sb = T.scaleBoxDots(bk, 'minPent', p);
+      deepEq(sb.dots.map(dotKey).sort(), pent.dots.map(dotKey).sort(),
+             'scaleBoxDots(minPent) == pentBoxDots, key ' + bk + ' ' + p.shape);
+      var fl = T.scaleBoxDots(bk, 'minor', p);
+      ok(pent.dots.every(function (d) {
+        return fl.dots.some(function (f) { return dotKey(f) === dotKey(d); });
+      }), 'full-scale box contains the pentatonic box, key ' + bk + ' ' + p.shape);
+      ok(fl.dots.length > pent.dots.length, 'full box adds scale tones ' + bk + ' ' + p.shape);
+      eq(fl.lo, pent.lo, 'full box shares the pent span lo');
+      eq(fl.hi, pent.hi, 'full box shares the pent span hi');
+      // Dorian = minor pent + 2 and 6 — the box must contain the pent skeleton
+      var dor = T.scaleBoxDots(bk, 'dorian', p);
+      ok(pent.dots.every(function (d) {
+        return dor.dots.some(function (f) { return dotKey(f) === dotKey(d); });
+      }), 'dorian box contains the minor-pent box, key ' + bk + ' ' + p.shape);
+      ok(dor.dots.every(function (d) { return [0,2,3,5,7,9,10].indexOf(d.interval) !== -1; }),
+         'dorian box has only dorian tones, key ' + bk + ' ' + p.shape);
+    });
+  }
+
   // --- per-song plumbing ---
   var st3 = T.songTriads(['G', 'C', 'D', 'Em']);
   eq(st3.key.name, 'G', 'key detected from chords');

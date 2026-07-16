@@ -267,18 +267,40 @@ input[type="range"] { accent-color: var(--accent); }
 .song-scroll.fit .section { break-inside: auto; margin: 8px 0 10px; }
 .song-scroll.fit .section-head { break-after: avoid; }
 .song-scroll.fit .line, .song-scroll.fit pre.tabline { break-inside: avoid; }
-/* the strips live above the columns now — pinned, full viewport width */
-.main > .diagram-strip, .main > .triad-strip { margin: 8px 12px; }
+/* the strips live above the columns now — pinned edge to edge, closed by
+   a single bottom divider (mirrors the scales column's left divider) */
+/* strip collapse: ⌃ tucks the charts into a slim rail at the top */
+.strip-collapse {
+  position: absolute; top: 5px; right: 7px; z-index: 2;
+  font-size: 13px; padding: 2px 7px; color: var(--text-dim);
+  background: none; border: none;
+}
+.strip-collapse:hover { color: var(--text); border: none; }
+/* edge-to-edge bar with only its bottom line — together with the scales
+   rail it frames the lyrics (top + right) */
+.strip-rail {
+  position: relative;
+  margin: 0; padding: 5px 0; text-align: center;
+  font-size: 13.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.2px; color: var(--text-dim); cursor: pointer;
+  background: var(--bg-inset); border: none;
+  border-bottom: 1px solid var(--border); border-radius: 0;
+}
+.strip-rail:hover { background: var(--border); color: var(--text); }
+.strip-rail .rail-caret {
+  position: absolute; right: 14px; top: 4px;
+  transform: rotate(-90deg);   /* « pointing down */
+}
 .song-cols { flex: 1; min-height: 0; display: flex; }
 
 .diagram-strip {
   display: flex; gap: 4px; flex-wrap: wrap; align-items: flex-start;
-  padding: 10px 8px 4px; margin-bottom: 10px;
-  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid var(--border);
 }
 /* charts shrink equally so the whole strip stays on one centered line no
    matter how many chords the song has; flex-basis is the max (roomy) size */
-.diagram-strip { flex-wrap: nowrap; justify-content: center; overflow-x: auto; }
+.diagram-strip { flex-wrap: nowrap; justify-content: center; overflow-x: auto; position: relative; }
 .diagram-strip .dg {
   cursor: pointer; border-radius: 8px; padding: 2px;
   flex: 0 1 170px; min-width: 55px;
@@ -495,11 +517,11 @@ pre.tabline {
 /* ---------- triad strip (song view) ---------- */
 
 .triad-strip {
-  position: relative;   /* the pentatonics zone anchors to the strip itself */
-  padding: 10px 12px 8px; margin-bottom: 10px;
-  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;
+  position: relative;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
 }
-.ts-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.ts-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; padding-right: 28px; }
 .ts-lab {
   font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px;
   color: var(--text-dim);
@@ -559,15 +581,19 @@ pre.tabline {
   background: none; border: none;
 }
 .sc-collapse:hover { color: var(--text); border: none; }
-/* collapsed: a slim clickable rail hugging the right edge */
+/* collapsed: a slim clickable rail hugging the right edge — filled by
+   default so it reads as a frame edge, not empty space */
 .scale-col.collapsed {
-  flex: 0 0 26px; padding: 12px 0; cursor: pointer;
-  align-items: center; justify-content: flex-start;
+  flex: 0 0 30px; padding: 12px 0; cursor: pointer;
+  align-items: center; justify-content: center;
+  background: var(--bg-inset);
 }
-.scale-col.collapsed:hover { background: var(--bg-inset); }
+.scale-col.collapsed:hover { background: var(--border); }
+.sc-rail-caret { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); }
+.scale-col.collapsed { position: relative; }
 .sc-rail-lab {
   writing-mode: vertical-rl;
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  font-size: 13.5px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 1.2px; color: var(--text-dim); white-space: nowrap;
 }
 .scale-col.collapsed:hover .sc-rail-lab { color: var(--text); }
@@ -576,8 +602,18 @@ pre.tabline {
    header height and equal-flex cards. flex bases are 0 (not auto) so the
    SVGs' intrinsic size never blocks shrinking on short windows */
 .sc-grid { flex: 1 1 0; min-height: 0; display: flex; gap: 10px; justify-content: center; }
-/* names in their own header row, flush under the PENTATONICS label and
-   aligned over the two flavor stacks */
+/* SCALES label + the current kind as a key-style accent chip that opens
+   the popup (same interaction and blue as the toolbar key selector) */
+.scale-col .ts-zone-head { gap: 8px; }
+.sc-kind-btn {
+  background: var(--accent); border: none; border-radius: 6px;
+  font-size: 12.5px; font-weight: 700; padding: 3px 11px;
+  color: var(--accent-text); cursor: pointer;
+}
+.sc-kind-btn:hover { filter: brightness(1.12); border: none; }
+.sc-menu .km-grid { grid-template-columns: 1fr; }
+/* names in their own header row, flush under the label and aligned over the
+   two flavor stacks */
 .sc-names { flex: 0 0 auto; display: flex; gap: 10px; }
 .sc-name {
   flex: 1 1 0; min-width: 0; text-align: center;
@@ -748,6 +784,7 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
   .sidebar, .toolbar button, .toolbar .tgroup, .diagram-strip .dg:hover, .perform-bar { display: none !important; }
   .ts-head { display: none !important; }
   .scale-col { display: none !important; }
+  .strip-rail, .strip-collapse { display: none !important; }
   .ts-flag { display: none; }
   /* paper has no horizontal scroll — let strips wrap when printing */
   .ts-tiles, .diagram-strip { flex-wrap: wrap; overflow: visible; }
