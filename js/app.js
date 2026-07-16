@@ -374,7 +374,7 @@
       // no per-card name — the flavor is named once at the top of its column
       '<span class="ts-neck">' + DG.renderScaleSVG({
         startFret: box.lo, endFret: box.hi, dots: scDots,
-        width: 104,
+        width: 104, height: 96,
         ariaLabel: title + ' pentatonic, ' +
           (box.lo === 0 ? 'open position' : 'frets ' + box.lo + '-' + box.hi)
       }) + '</span>' +

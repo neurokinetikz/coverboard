@@ -547,11 +547,12 @@ pre.tabline {
 /* deterministic width (never derived from height — tall narrow windows used
    to balloon the cards past the viewport edge); charts contain-fit both ways */
 .scale-col {
-  flex: 0 0 clamp(200px, 24vw, 330px); display: flex; flex-direction: column; gap: 5px;
+  flex: 0 0 clamp(230px, 30vw, 420px); display: flex; flex-direction: column; gap: 5px;
   padding: 8px 12px 10px; border-left: 1px solid var(--border);
   overflow: hidden;
 }
 .scale-col .ts-zone-head { flex: 0 0 auto; padding-bottom: 1px; }
+.scale-col .ts-zone-head .ts-lab { font-size: 14px; letter-spacing: 1px; }
 .ts-zone-head { display: flex; align-items: center; justify-content: center; }
 /* two flavor sub-columns; rows align because both stacks share the same
    header height and equal-flex cards. flex bases are 0 (not auto) so the
@@ -569,7 +570,9 @@ pre.tabline {
    hugs the names, the last hugs the window bottom, leftover spreads thinly */
 .sc-flavor {
   flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
-  gap: 4px; min-height: 0; justify-content: space-between;
+  /* the gap is rigid: it guarantees row separation even when short windows
+     force the cards to shrink (space-between only spreads LEFTOVER) */
+  gap: 14px; min-height: 0; justify-content: space-between;
 }
 .sc-flavor + .sc-flavor { border-left: 1px solid var(--border); padding-left: 10px; }
 .sc-flavor .ts-scale { flex: 0 1 auto; min-height: 0; }

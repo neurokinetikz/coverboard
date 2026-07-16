@@ -178,10 +178,11 @@
     var nStrings = 6;
 
     var padTop = label ? 15 : 2;            // same name slot as chord charts
-    // uniform header row (open dots or nothing) and a uniform right gutter
-    // for the side fret tag — every card gets the SAME grid box
-    var markerRow = 9;
+    // open cards need headroom for the open-string dots; fretted cards get
+    // only a sliver — an empty reserved band reads as wasted padding
+    var markerRow = hasOpenRow ? 9 : 3;
     var gridTop = padTop + markerRow;
+    // uniform right gutter for the side fret tag — same grid WIDTH every card
     var padLeft = 13, padRight = 24;
     var gridW = W - padLeft - padRight;
     var gridH = H - gridTop - 4;
@@ -228,7 +229,9 @@
       var cx = X(d.string);
       var cy = d.fret === 0 ? gridTop - 5 : dotY(d.fret);
       var cls = (ROLE_CLASS[d.role] || 'cd-3') + (d.ghost ? ' cd-ghost' : '');
-      var rr = d.ghost ? dotR * 0.62 : (d.fret === 0 ? 3.1 : dotR);
+      // tonics read as markers, not targets: a notch under full size, still
+      // clearly larger than the ghosted scale tones
+      var rr = d.ghost ? dotR * 0.62 : (d.fret === 0 ? 2.9 : dotR * 0.85);
       out.push('<g class="' + cls + '"><circle cx="' + cx + '" cy="' + cy +
                '" r="' + rr + '" class="cd-dot"/></g>');
     });
