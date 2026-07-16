@@ -28,7 +28,7 @@
              individually visible). } */
   function renderChordSVG(shape, opts) {
     opts = opts || {};
-    var W = opts.width || 94;
+    var W = opts.width || 96;
     var H = opts.height || 102;
     var label = opts.label || '';
     var showFingers = opts.showFingers !== false;
@@ -55,7 +55,7 @@
     var padTop = label ? 15 : 4;      // room for the chord name
     var markerRow = 9;                // open/mute markers
     var gridTop = padTop + markerRow;
-    var padLeft = 13, padRight = 20;
+    var padLeft = 13, padRight = 22;
     var gridW = W - padLeft - padRight;
     var gridH = H - gridTop - 8;
     var sx = gridW / (nStrings - 1);   // string spacing
@@ -81,7 +81,8 @@
       out.push('<rect x="' + (padLeft - 1) + '" y="' + (gridTop - 2.4) + '" width="' + (gridW + 2) +
                '" height="2.8" rx="1" class="cd-nut"/>');
     } else {
-      out.push('<text x="' + (W - padRight + 4) + '" y="' + (gridTop + fy * 0.65) +
+      // +7 keeps clear air between a first-row dot on string 1 and the label
+      out.push('<text x="' + (W - padRight + 7) + '" y="' + (gridTop + fy * 0.65) +
                '" font-size="8.5" class="cd-basefret">' + base + 'fr</text>');
     }
 
