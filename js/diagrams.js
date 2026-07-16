@@ -28,7 +28,7 @@
              individually visible). } */
   function renderChordSVG(shape, opts) {
     opts = opts || {};
-    var W = opts.width || 82;
+    var W = opts.width || 94;
     var H = opts.height || 102;
     var label = opts.label || '';
     var showFingers = opts.showFingers !== false;
@@ -49,19 +49,18 @@
              : (maxFret > 4 ? minFret : 1);
     if (maxFret - base + 1 > nFrets) nFrets = Math.min(5, maxFret - base + 1);
 
-    // layout
+    // layout: a UNIFORM right gutter holds the "Nfr" label, so open and
+    // fretted charts get identical grid widths (open charts just leave the
+    // gutter empty) — no more narrow grids beside wide ones in a strip
     var padTop = label ? 15 : 4;      // room for the chord name
     var markerRow = 9;                // open/mute markers
     var gridTop = padTop + markerRow;
-    var padLeft = 13, padRight = base > 1 ? 20 : 8;
+    var padLeft = 13, padRight = 20;
     var gridW = W - padLeft - padRight;
     var gridH = H - gridTop - 8;
     var sx = gridW / (nStrings - 1);   // string spacing
     var fy = gridH / nFrets;           // fret spacing
-    // dot size comes from the label-free geometry so charts with an "Nfr"
-    // label don't render smaller, lighter dots than open-position charts
-    var sxDot = (W - padLeft - 8) / (nStrings - 1);
-    var dotR = Math.min(sxDot, fy) * 0.36;
+    var dotR = Math.min(sx, fy) * 0.36;
 
     function X(s) { return padLeft + s * sx; }
     function fretY(f) { return gridTop + f * fy; } // f = 0..nFrets grid line
@@ -98,13 +97,12 @@
                (0.7 + (5 - s) * 0.08) + '"/>');
     }
 
-    // barre (clamped to the viewBox so full-width barres don't clip; when a
-    // base-fret label is shown, also kept clear of its column)
+    // barre (clamped to the viewBox so full-width barres don't clip; the
+    // uniform gutter keeps it clear of the base-fret label by construction)
     if (shape.barre && !roles && shape.barre.fret >= base) {
       var by = dotY(shape.barre.fret);
       var bx1 = Math.max(1, X(shape.barre.from) - dotR * 0.85);
-      var bx2 = Math.min(base > 1 ? W - padRight + 1 : W - 1,
-                         X(shape.barre.to) + dotR * 0.85);
+      var bx2 = Math.min(W - 1, X(shape.barre.to) + dotR * 0.85);
       out.push('<rect x="' + bx1 + '" y="' + (by - dotR * 0.8) +
                '" width="' + (bx2 - bx1) + '" height="' + (dotR * 1.6) +
                '" rx="' + (dotR * 0.8) + '" class="cd-barre"/>');

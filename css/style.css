@@ -281,7 +281,7 @@ input[type="range"] { accent-color: var(--accent); }
 .diagram-strip { flex-wrap: nowrap; justify-content: center; overflow-x: auto; }
 .diagram-strip .dg {
   cursor: pointer; border-radius: 8px; padding: 2px;
-  flex: 0 1 148px; min-width: 48px;
+  flex: 0 1 170px; min-width: 55px;
 }
 .diagram-strip .dg:hover { background: var(--bg-inset); }
 .diagram-strip .chord-svg { width: 100%; height: auto; display: block; }
@@ -421,7 +421,7 @@ pre.tabline {
 .voicing-pager { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 8px 0; }
 .voicing-pager .vp-num { font-size: 12px; color: var(--text-dim); min-width: 46px; text-align: center; }
 .voicing-big { display: flex; flex-direction: column; align-items: center; }
-.voicing-big .chord-svg { width: 180px; height: 224px; }
+.voicing-big .chord-svg { width: 206px; height: 224px; }
 
 /* substitutions modal */
 .sub-head {
@@ -444,7 +444,7 @@ pre.tabline {
 }
 .sub-item:hover { border-color: var(--accent); }
 .sub-dg { flex: 0 0 auto; }
-.sub-dg .chord-svg { width: 90px; height: 112px; display: block; }
+.sub-dg .chord-svg { width: 103px; height: 112px; display: block; }
 .sub-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .sub-sym { font-size: 15.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .sub-roman { font-size: 12px; font-weight: 600; color: var(--accent); font-style: normal; }
@@ -518,7 +518,7 @@ pre.tabline {
 }
 .ts-tile {
   display: flex; flex-direction: column; align-items: center; gap: 1px;
-  flex: 0 1 148px; min-width: 48px;
+  flex: 0 1 170px; min-width: 55px;
 }
 .ts-orig { font-size: 10px; font-weight: 600; color: var(--text-dim); line-height: 1.2; }
 /* the chart SVG carries ~10px of internal bottom padding — pull the caption

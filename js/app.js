@@ -359,15 +359,13 @@
               ' (tap for all triads)') + '">' +
           DG.renderChordSVG(v, { label: c.triad.label, showFingers: false,
                                  roles: triadRoles(v) }) + '</span>');
-        var flag = pick.outOfPosition ? '<span class="ts-flag out">off-pos</span>'
-                 : pick.relaxed ? '<span class="ts-flag">±' + pick.relaxed + 'fr</span>' : '';
-        // the Strings selector already says which set; call it out only when
-        // the engine had to fall back to a different one
+        // no badges under the strip charts — the fret label already says
+        // where the grip sits, and off-pos/±fr read as clutter (user call)
         // the set prefix shows whenever the voicing left the chosen set —
         // in Near mode ('near' matches no set id) that's every chart, by design
         var capTxt = (v.stringSet !== setPref ? v.stringSet + ' · ' : '') +
           triadInvName(v.inversion);
-        out.push('<span class="ts-cap">' + esc(capTxt) + flag + '</span>');
+        out.push('<span class="ts-cap">' + esc(capTxt) + '</span>');
       }
       out.push('</span>');
     });
