@@ -5,7 +5,8 @@
 
   var CT = window.ChordTheory, Parser = window.SongParser, V = window.Voicings,
       DG = window.Diagrams, Search = window.SongSearch, Store = window.SongStore,
-      FS = window.SongFileStore, TR = window.Triads, FB = window.Fretboard;
+      FS = window.SongFileStore, TR = window.Triads, FB = window.Fretboard,
+      FL = window.Follow;
 
   var App = {
     state: {
@@ -76,7 +77,30 @@
 
   /* ---------- section / line rendering (shared by song view & preview) ---------- */
 
-  function segHTML(chordSym, text, clickable, isAnnot) {
+  /* Wrap the index-consuming words of a lyric slice in <span class="w"
+     data-w="K"> spans (K = word ordinal within the LINE, from
+     Follow.wordRanges — the same contract buildIndex uses). A word split
+     across two chord segments yields two spans with the same K; marking
+     both halves works fine. */
+  function wrapWords(text, offset, ranges) {
+    if (!ranges || !ranges.length || !text) return text ? esc(text) : '';
+    var end = offset + text.length;
+    var html = '';
+    var pos = offset;
+    for (var k = 0; k < ranges.length; k++) {
+      var r = ranges[k];
+      if (r.e <= pos || r.s >= end) continue;
+      var ws = Math.max(r.s, pos), we = Math.min(r.e, end);
+      if (ws > pos) html += esc(text.slice(pos - offset, ws - offset));
+      html += '<span class="w" data-w="' + k + '">' +
+        esc(text.slice(ws - offset, we - offset)) + '</span>';
+      pos = we;
+    }
+    if (pos < end) html += esc(text.slice(pos - offset));
+    return html;
+  }
+
+  function segHTML(chordSym, text, clickable, isAnnot, offset, ranges) {
     var c;
     if (chordSym && isAnnot) {
       c = '<span class="c ann">' + esc(chordSym) + '</span>';
@@ -86,26 +110,32 @@
     } else {
       c = '<span class="c">&nbsp;</span>';
     }
-    return '<span class="seg">' + c + '<span class="l">' + (text ? esc(text) : '&nbsp;') + '</span></span>';
+    return '<span class="seg">' + c + '<span class="l">' +
+      (text ? wrapWords(text, offset || 0, ranges) : '&nbsp;') + '</span></span>';
   }
 
-  function chordLyricHTML(line, tr, flat, clickable) {
+  function chordLyricHTML(line, tr, flat, clickable, attr) {
+    attr = attr || '';
     var events = (line.chords || []).map(function (c) {
       return { sym: c.sym, pos: c.pos, annot: false };
     }).concat((line.annots || []).map(function (a) {
       return { sym: a.text, pos: a.pos, annot: true };
     })).sort(function (a, b) { return a.pos - b.pos; });
     var lyric = line.lyric || '';
+    var ranges = window.Follow ? window.Follow.wordRanges(lyric) : [];
     if (!events.length) {
-      return '<div class="line lyric-only">' + esc(lyric) + '</div>';
+      return '<div class="line lyric-only"' + attr + '>' +
+        wrapWords(lyric, 0, ranges) + '</div>';
     }
-    var html = '<div class="line cl">';
-    if (events[0].pos > 0) html += segHTML(null, lyric.slice(0, events[0].pos), false, false);
+    var html = '<div class="line cl"' + attr + '>';
+    if (events[0].pos > 0) {
+      html += segHTML(null, lyric.slice(0, events[0].pos), false, false, 0, ranges);
+    }
     for (var i = 0; i < events.length; i++) {
       var start = events[i].pos;
       var end = i + 1 < events.length ? events[i + 1].pos : Math.max(lyric.length, start);
       var shown = events[i].annot ? events[i].sym : dispChord(events[i].sym, tr, flat);
-      html += segHTML(shown, lyric.slice(start, end), clickable, events[i].annot);
+      html += segHTML(shown, lyric.slice(start, end), clickable, events[i].annot, start, ranges);
     }
     return html + '</div>';
   }
@@ -147,6 +177,10 @@
     var flat = opts.preferFlat || false;
     var clickable = opts.clickableChords !== false;
     var out = [];
+    // lyric-bearing lines get data-line="N" — the SAME qualification rule as
+    // Follow.buildIndex (chordlyric/lyric kinds), so DOM and lyric index
+    // stay 1:1 by construction
+    var lineNo = 0;
     parsed.sections.forEach(function (sec, si) {
       var type = sec.type || 'none';
       out.push('<div class="section" data-type="' + esc(type) + '" data-sec="' + si + '">');
@@ -168,9 +202,13 @@
           case 'chords':
             out.push(chordRowHTML(line, tr, flat, clickable)); break;
           case 'chordlyric':
-            out.push(chordLyricHTML(line, tr, flat, clickable)); break;
+            out.push(chordLyricHTML(line, tr, flat, clickable,
+              ' data-line="' + (lineNo++) + '"')); break;
           default:
-            out.push('<div class="line lyric-only">' + esc(line.lyric || '') + '</div>');
+            out.push('<div class="line lyric-only" data-line="' + (lineNo++) +
+              '">' + wrapWords(line.lyric || '', 0,
+                window.Follow ? window.Follow.wordRanges(line.lyric || '') : []) +
+              '</div>');
         }
       });
       out.push('</div></div>');
@@ -547,6 +585,9 @@
     if (App.state.sidebarOpen) sb.classList.add('open');
     if (Store.getSettings().sidebarCollapsed) sb.classList.add('collapsed');
     applyFontSize();
+    if (FL && FL.active() && FL.currentLine() >= 0) {
+      applyFollowLine(FL.currentLine());   // survive full re-renders
+    }
     var q = $('#search-input');
     if (q) {
       q.value = App.state.query;
@@ -799,8 +840,16 @@
       '</div>' +
       capoChip +
       '</div>' +
-      '<div class="tb-center"><div class="titleblock"><div class="t">' + esc(song.title) + '</div>' +
-      '<div class="a">' + esc(song.artist || '') + '</div></div></div>' +
+      '<div class="tb-center">' +
+      '<div class="titleblock"><div class="t">' + esc(song.title) + '</div>' +
+      '<div class="a">' + esc(song.artist || '') + '</div></div>' +
+      (FL && FL.bestEngine()
+        ? '<button data-act="toggle-follow" id="follow-btn" class="icon tb-mic' +
+          (FL.active() ? ' active listening' : '') +
+          '" title="Follow — listen while you sing and highlight the current line">🎤</button>'
+        : '<button id="follow-btn" class="icon tb-mic" disabled ' +
+          'title="Follow mode needs a browser with speech recognition (Chrome)">🎤</button>') +
+      '</div>' +
       '<div class="tb-right">' +
       '<div class="tgroup" title="' + (fit ? 'Max font size (Fit picks the largest that fits)' : 'Font size') + '"><span class="lbl">A</span>' +
         '<button data-act="font" data-d="-1">−</button>' +
@@ -814,7 +863,7 @@
       '</div>') +
       '<button data-act="toggle-diagrams" class="' + (settings.showDiagrams ? 'active' : '') + '" title="Chord diagrams">◫ Chords</button>' +
       '<button data-act="toggle-triads" class="' + (settings.showTriads ? 'active' : '') + '" title="Triad charts at CAGED positions">△ Triads</button>' +
-      '<button data-act="edit-song" title="Edit">✎</button>' +
+      '<button data-act="edit-song" class="icon" title="Edit">✎</button>' +
       '<button data-act="print" class="icon" title="Print">⎙</button>' +
       '<button data-act="delete-song" class="icon danger" title="Delete">🗑</button>' +
       '</div></div>' +
@@ -2031,6 +2080,92 @@
     var b = $('#autoscroll-btn');
     if (b) b.textContent = '⏸';
   }
+  /* ---------- follow mode UI glue (engine/tracker live in follow.js) ---------- */
+
+  function applyFollowLine(n) {
+    var sc = $('#song-scroll');
+    if (!sc) return;
+    var prev = $('.sung-cur', sc);
+    if (prev) prev.classList.remove('sung-cur');
+    var el = $('[data-line="' + n + '"]', sc);
+    if (!el) return;
+    el.classList.add('sung-cur');
+    // a highlighted line inside a collapsed section is invisible — expand it
+    var sec = el.closest ? el.closest('.section') : null;
+    if (sec && sec.classList.contains('collapsed')) {
+      sec.classList.remove('collapsed');
+      scheduleFit();
+    }
+    if (!Store.getSettings().fitMode && el.scrollIntoView) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }
+
+  function updateFollowBtn() {
+    var b = $('#follow-btn');
+    if (!b) return;
+    var on = FL && FL.active();
+    b.classList.toggle('active', !!on);
+    b.classList.toggle('listening', !!on);
+  }
+
+  /* karaoke layer: words sung so far in the CURRENT sung line light up.
+     wordLine can trail the highlighted line (teleprompter look-ahead) —
+     marks always go on the line the words belong to. */
+  function applyFollowWord(lineIdx, wi) {
+    var sc = $('#song-scroll');
+    if (!sc) return;
+    var stale = sc.querySelectorAll('.w.sung');
+    for (var i = 0; i < stale.length; i++) {
+      var host = stale[i].closest ? stale[i].closest('[data-line]') : null;
+      if (!host || host.getAttribute('data-line') !== String(lineIdx)) {
+        stale[i].classList.remove('sung');
+      }
+    }
+    var el = $('[data-line="' + lineIdx + '"]', sc);
+    if (!el) return;
+    var ws = el.querySelectorAll('.w');
+    for (var k = 0; k < ws.length; k++) {
+      ws[k].classList.toggle('sung',
+        parseInt(ws[k].getAttribute('data-w'), 10) <= wi);
+    }
+  }
+
+  var followUI = {
+    onLine: applyFollowLine,
+    onWord: applyFollowWord,
+    onState: function () { updateFollowBtn(); },
+    onError: function (code) {
+      updateFollowBtn();
+      var msgs = {
+        'mic-denied': 'Mic access denied — if you opened the file directly, try http://localhost (see README)',
+        'service-denied': 'Speech service not allowed in this context',
+        'network': 'Speech service unreachable — Follow needs internet in this version',
+        'no-mic': 'No microphone found',
+        'no-engine': 'This browser has no speech recognition — try Chrome',
+        'start-failed': 'Could not start listening'
+      };
+      toast(msgs[code] || 'Follow mode error: ' + code);
+      var sc = $('#song-scroll');
+      var prev = sc && $('.sung-cur', sc);
+      if (prev) prev.classList.remove('sung-cur');
+    }
+  };
+
+  function followStop() {
+    if (FL && FL.active()) {
+      FL.stop();
+      var sc = $('#song-scroll');
+      if (sc) {
+        var prev = $('.sung-cur', sc);
+        if (prev) prev.classList.remove('sung-cur');
+        var ws = sc.querySelectorAll('.w.sung');
+        for (var i = 0; i < ws.length; i++) ws[i].classList.remove('sung');
+      }
+      updateFollowBtn();
+    }
+  }
+
   function autoStop() {
     Auto.on = false;
     if (Auto.raf) cancelAnimationFrame(Auto.raf);
@@ -2048,7 +2183,13 @@
     else if (st.view === 'fretboard') h = '#fretboard';
     else if (st.view === 'practice' && st.songId) h = '#practice/' + st.songId;
     if (h && location.hash !== h) {
-      try { history.replaceState(null, '', h); } catch (e) { /* file:// quirk */ }
+      // a different route = real navigation: create a history entry so the
+      // browser Back button walks app views instead of leaving the site.
+      // The very first route (no hash yet) replaces, avoiding a dead entry.
+      try {
+        if (location.hash) history.pushState(null, '', h);
+        else history.replaceState(null, '', h);
+      } catch (e) { /* file:// quirk */ }
     } else if (!h && location.hash) {
       // state with no hash form (e.g. empty-library song view): clear the old
       // hash so a reload doesn't resurrect the previous view
@@ -2074,10 +2215,27 @@
     }
   }
 
+  // browser Back/Forward walk the entries syncHash pushed — re-route and
+  // render only when the route actually changed (popstate never fires for
+  // our own pushState calls, so there is no feedback loop)
+  window.addEventListener('popstate', function () {
+    var pv = App.state.view, ps = App.state.songId, pl = App.state.setlistId;
+    readHash();
+    if (App.state.view !== pv || App.state.songId !== ps ||
+        App.state.setlistId !== pl) {
+      autoStop();
+      followStop();
+      closeKeyMenu();
+      closeScalesMenu();
+      render();
+    }
+  });
+
   /* ---------- actions (event delegation) ---------- */
 
   function openSong(id) {
     autoStop();
+    followStop();
     App.state.view = 'song';
     App.state.songId = id;
     App.state.sidebarOpen = false;
@@ -2112,6 +2270,16 @@
       if (cf.length !== 6 || cf.some(isNaN)) cf = null;
       subsModal(csym, { kind: 'chord', frets: cf }, { ctx: chordCtx(csym) });
       return;
+    }
+
+    // follow mode: tapping a lyric line re-syncs the tracker there (chord
+    // taps above still open the subs modal while following)
+    if (FL && FL.active()) {
+      var seekEl = t.closest ? t.closest('#song-scroll [data-line]') : null;
+      if (seekEl) {
+        FL.seek(parseInt(seekEl.getAttribute('data-line'), 10));
+        return;
+      }
     }
 
     var actEl = t.closest ? t.closest('[data-act]') : null;
@@ -2169,7 +2337,19 @@
         autoStop();
         render();
         break;
-      case 'autoscroll': Auto.on ? autoStop() : autoStart(); break;
+      case 'autoscroll':
+        if (Auto.on) autoStop();
+        else { followStop(); autoStart(); }   // follow-scroll vs autoTick: never both
+        break;
+      case 'toggle-follow': {
+        if (FL.active()) { followStop(); break; }
+        var fsong = Store.getSong(st.songId);
+        if (!fsong) break;
+        autoStop();                            // mutual exclusion: follow wins
+        FL.start(Store.parsedSong(fsong), followUI);
+        updateFollowBtn();
+        break;
+      }
       case 'toggle-diagrams':
         Store.setSetting('showDiagrams', !Store.getSettings().showDiagrams);
         render();
@@ -2210,6 +2390,7 @@
         st.perform = null;
         st.sidebarOpen = false;
         autoStop();
+        followStop();
         render();
         break;
       case 'practice-next': practiceStep(1); break;
@@ -2233,6 +2414,7 @@
         st.perform = null;
         st.sidebarOpen = false;   // close the mobile drawer
         autoStop();
+        followStop();
         render();
         break;
       }
@@ -2328,7 +2510,7 @@
         scheduleFit();
         break;
 
-      case 'view-setlists': st.view = 'setlists'; st.perform = null; st.sidebarOpen = false; autoStop(); render(); break;
+      case 'view-setlists': st.view = 'setlists'; st.perform = null; st.sidebarOpen = false; autoStop(); followStop(); render(); break;
       case 'back-to-song': st.view = 'song'; render(); break;
       case 'open-setlist': st.view = 'setlist'; st.setlistId = id; render(); break;
       case 'add-setlist': {
@@ -2450,7 +2632,10 @@
     }
     if (e.key === ' ' && App.state.view === 'song' && !$('#modal-backdrop')) {
       e.preventDefault();
-      if (!Store.getSettings().fitMode) Auto.on ? autoStop() : autoStart();
+      if (!Store.getSettings().fitMode) {
+        if (Auto.on) autoStop();
+        else { followStop(); autoStart(); }
+      }
     } else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && App.state.perform) {
       var btn = $(e.key === 'ArrowRight' ? '[data-act="perform-next"]' : '[data-act="perform-prev"]');
       if (btn && !btn.disabled) btn.click();

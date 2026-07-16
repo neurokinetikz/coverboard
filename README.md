@@ -32,6 +32,22 @@ Section headers in any style — `[Chorus]`, `Chorus:`, `CHORUS`, `(Bridge)`,
 (verse=blue, chorus=amber, pre-chorus=teal, bridge=pink, intro=purple, solo=orange,
 instrumental=green, outro=gray). Tap a section header to collapse it.
 
+## Follow mode
+
+Tap **🎤** in the song toolbar, start singing, and the app highlights the
+line you're on — scrolling it into view as you go (in Fit mode it highlights
+without scrolling). Tap any lyric line while listening to re-sync. It never
+listens unless you turn it on.
+
+Under the hood this is *alignment*, not transcription: the lyrics are known,
+so even the noisy recognition you get while strumming is plenty to track
+position. The current engine is the browser's built-in speech recognition —
+which means **Chrome, an internet connection, and your audio being processed
+by the browser's speech service** while following. If the mic is blocked when
+opening `index.html` directly from disk, serve it locally instead:
+`python3 -m http.server` then `http://localhost:8000`. Recognition is a
+swappable engine — a fully offline on-device engine is planned.
+
 ## Learn: triads & CAGED
 
 Toggle **△ Triads** in the song toolbar and the diagram strip switches to

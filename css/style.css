@@ -15,6 +15,8 @@ html[data-theme="light"] {
   --accent: #2f6fed;
   --accent-text: #ffffff;
   --chord: #c2410c;
+  --sung-bg: rgba(47, 111, 237, 0.08);
+  --sung-text: #0b1020;
   --danger: #d33;
   --shadow: 0 1px 4px rgba(20, 30, 50, 0.09);
   --sec-intro: #8b5cf6;
@@ -41,6 +43,8 @@ html[data-theme="dark"] {
   --accent: #4d8dff;
   --accent-text: #ffffff;
   --chord: #ffa94d;
+  --sung-bg: rgba(77, 141, 255, 0.12);
+  --sung-text: #ffffff;
   --danger: #ff6b6b;
   --shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
   --sec-intro: #a78bfa;
@@ -73,7 +77,9 @@ button {
 button:hover { border-color: var(--accent); }
 button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 button.danger { color: var(--danger); }
-button.icon { padding: 6px 8px; line-height: 1; }
+/* glyph buttons: text icons (◐ ⚙ ☰ ✎ ⎙ ↑ ✕ ‹) render small at the base
+   13px — scale them all to fill the box like the 🗑 emoji does */
+button.icon { padding: 5px 8px; line-height: 1; font-size: 16.5px; }
 button.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 input[type="text"], input[type="number"], textarea, select {
   font-family: inherit; font-size: 14px; color: var(--text);
@@ -120,7 +126,7 @@ input[type="range"] { accent-color: var(--accent); }
 .sort-row { display: flex; align-items: center; gap: 5px; padding: 8px 0 0; }
 .sort-row .lbl { font-size: 11px; color: var(--text-dim); margin-right: 2px; }
 .sort-row button.mini { font-size: 11.5px; padding: 3px 0; flex: 1; border-radius: 6px; }
-.sort-row button.mini.ico { flex: 0 0 auto; padding: 3px 8px; font-size: 13px; line-height: 1; }
+.sort-row button.mini.ico { flex: 0 0 auto; padding: 2px 8px; font-size: 15px; line-height: 1; }
 .sort-row button.mini.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 
 .sidebar-actions { display: flex; gap: 6px; padding: 0 12px 10px; }
@@ -168,6 +174,28 @@ input[type="range"] { accent-color: var(--accent); }
 }
 .empty-hint { padding: 24px 16px; color: var(--text-dim); font-size: 13px; text-align: center; line-height: 1.6; }
 
+/* follow mode: words sung so far turn accent inside their line */
+.line .w { transition: color 0.15s; }
+.line .w.sung { color: var(--accent); font-weight: 600; }
+/* follow mode: the line currently being sung */
+.line.sung-cur {
+  background: var(--sung-bg); border-radius: 6px;
+  color: var(--sung-text); font-weight: 700;
+  /* widen the highlight without shifting layout */
+  box-shadow: -10px 0 0 var(--sung-bg), 10px 0 0 var(--sung-bg);
+  position: relative;
+  transition: background-color 0.25s;
+}
+#follow-btn.listening {
+  color: #e5484d; border-color: #e5484d;
+  animation: follow-pulse 1.6s ease-in-out infinite;
+}
+@keyframes follow-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.line.sung-cur::before {
+  content: ""; position: absolute; left: -17px; top: 22%; bottom: 22%;
+  width: 3px; border-radius: 2px; background: var(--accent);
+}
+
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
 /* ---------- song toolbar ---------- */
@@ -181,8 +209,16 @@ input[type="range"] { accent-color: var(--accent); }
 .toolbar.song-tb { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
 .song-tb .tb-left, .song-tb .tb-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .song-tb .tb-right { justify-content: flex-end; }
-.song-tb .tb-center { min-width: 0; }
-.song-tb .titleblock { margin-right: 0; text-align: center; }
+.song-tb .tb-center {
+  min-width: 0; display: flex; align-items: center;
+  justify-content: center; gap: 10px;
+}
+.song-tb .titleblock { margin-right: 0; text-align: center; min-width: 0; }
+/* mic spans the full title + artist height */
+button.tb-mic {
+  height: 46px; width: 46px; padding: 0; flex: none;
+  font-size: 23px; border-radius: 10px;
+}
 .toolbar .titleblock .t {
   font-size: 24px; font-weight: 800; letter-spacing: -0.3px; line-height: 1.2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -808,6 +844,9 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
   .ts-head { display: none !important; }
   .scale-col { display: none !important; }
   .strip-rail, .strip-collapse { display: none !important; }
+  .line.sung-cur { background: none; box-shadow: none; color: inherit; font-weight: inherit; }
+  .line.sung-cur::before { content: none; }
+  .line .w.sung { color: inherit; font-weight: inherit; }
   .ts-flag { display: none; }
   /* paper has no horizontal scroll — let strips wrap when printing */
   .ts-tiles, .diagram-strip { flex-wrap: wrap; overflow: visible; }

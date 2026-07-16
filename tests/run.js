@@ -10,6 +10,7 @@ var Store = require('../js/store.js');
 var T = require('../js/triads.js');
 var FB = require('../js/fretboard.js');
 var SB = require('../js/subs.js');
+var FL = require('../js/follow.js');
 
 var passed = 0, failed = 0, failures = [];
 function ok(cond, name, detail) {
@@ -1393,6 +1394,120 @@ function deepEq(a, b, name) {
   }).filter(function (x) { return x > 4; });  // ignore inlay r=4
   ok(radii.length === 2 && Math.min.apply(null, radii) < Math.max.apply(null, radii),
      'ghost radius smaller than normal dot');
+})();
+
+/* ============ follow (lyric aligner) ============ */
+
+(function () {
+  // 9 lyric-index lines: v1 (0,1), chorus1 (2,3), coffee (4), '# lead
+  // break' parses as a lyric line (5), singing (6), chorus2 (7,8) — the
+  // tab line is skipped. Choruses are verbatim repeats.
+  var raw = "[Verse 1]\nC        G\nWalking down the road, don't look back\nAm       F\nEvery little thing gonna be alright\n[Chorus]\nC        G\nHold on, hold on tonight\nAm       F\nWe are burning brighter now\n[Verse 2]\nC        G\nCoffee in the morning, 22 miles to go\n# lead break\ne|--0--2--3--|\nAm       F\nSinging to the radio all night long\n[Chorus]\nC        G\nHold on, hold on tonight\nAm       F\nWe are burning brighter now";
+  var parsed = Parser.parseSong(raw, {});
+  var idx = FL.buildIndex(parsed);
+
+  // normalization
+  eq(FL.normWord("Don't!"), 'dont', 'normWord folds apostrophes+punctuation');
+  eq(FL.normWord('café'), 'cafe', 'normWord strips diacritics');
+  eq(FL.normWord('...'), '', 'pure punctuation normalizes to empty');
+  eq(FL.normWord('Na-na-na'), 'nanana', 'hyphens collapse');
+  eq(FL.normWord('22'), '22', 'digits kept');
+
+  // index shape
+  eq(idx.lineCount, 9, 'lyric-line count (tab skipped, # comment-as-lyric kept)');
+  deepEq(idx.words[0], { w: 'walking', line: 0, wi: 0 }, 'first indexed word');
+  eq(idx.words[6].wi, 6, 'word ordinals count within the line');
+  eq(idx.words[7].wi, 0, 'ordinals restart on each line');
+  deepEq(FL.wordRanges("Hold on, hold on tonight"),
+         [{ s: 0, e: 4 }, { s: 5, e: 8 }, { s: 9, e: 13 }, { s: 14, e: 16 },
+          { s: 17, e: 24 }], 'wordRanges gives char offsets per counted token');
+  deepEq(FL.wordRanges('... -- !'), [], 'pure-punctuation tokens consume no range');
+  ok(idx.words.some(function (w) { return w.w === 'dont'; }), 'dont indexed');
+  eq(idx.words.filter(function (w) { return w.w === 'alright'; })[0].line, 1,
+     'alright maps to line 1');
+  eq(idx.words.filter(function (w) { return w.w === 'coffee'; })[0].line, 4,
+     'coffee maps to line 4 (indices survive tab/comment interleave)');
+  eq(idx.words.filter(function (w) { return w.w === 'singing'; })[0].line, 6,
+     'singing maps past the lead-break line');
+
+  // feeder: interim growth, final reset, rewrite divergence
+  var f = FL.createFeeder();
+  deepEq(f.push('hold on', false), ['hold', 'on'], 'interim feeds new words');
+  deepEq(f.push('hold on tonight', false), ['tonight'], 'growth feeds only the tail');
+  deepEq(f.push('hold on tonight', true), [], 'final after interim adds nothing');
+  deepEq(f.push('we are', false), ['we', 'are'], 'post-final stream is fresh');
+  var f2 = FL.createFeeder();
+  f2.push('walking down the wrote', false);
+  deepEq(f2.push('walking down the road dont', false), ['road', 'dont'],
+         'interim rewrite re-feeds from the divergence point');
+
+  // tracker: clean advance + teleprompter look-ahead
+  var t = FL.createTracker(idx);
+  var r = t.feed(FL.normWords('walking down the road'));
+  eq(r.line, 0, 'mid-line singing holds the current line');
+  ok(r.confidence > 0.8, 'high confidence on clean input');
+  eq(r.word, 3, 'word ordinal tracks within the line');
+  eq(r.wordLine, 0, 'wordLine matches the sung line mid-line');
+  r = t.feed(FL.normWords("don't look back"));
+  eq(r.line, 1, 'completing a line advances the highlight to the next');
+  eq(r.wordLine, 0, 'wordLine trails on the completed line');
+  eq(r.word, 6, 'last consumed word is the line-final word');
+  r = t.feed(FL.normWords('every little thing gonna be alright'));
+  eq(r.line, 2, 'completing line 1 advances to the chorus');
+  t.seek(8);
+  r = t.feed(FL.normWords('we are burning brighter now'));
+  eq(r.line, 8, 'the final line never advances past the song');
+
+  // noisy input still tracks
+  t = FL.createTracker(idx);
+  r = t.feed(FL.normWords('walking um the yeah road baby look whoa back every uh thing'));
+  eq(r.line, 1, 'noisy transcript still reaches line 1');
+
+  // fresh tracker pre-anchors on the first word-bearing line
+  t = FL.createTracker(idx);
+  eq(t.state().line, 0, 'fresh tracker starts on first line');
+  eq(t.state().cursor, 0, 'fresh tracker cursor at 0');
+
+  // garbage moves nothing
+  t = FL.createTracker(idx);
+  r = t.feed(FL.normWords('zebra quantum flapjack xylophone'));
+  eq(r.line, 0, 'garbage: holds at first line');
+  eq(r.cursor, 0, 'garbage: cursor holds');
+
+  // repeated chorus resolves forward-nearest
+  t = FL.createTracker(idx);
+  t.feed(FL.normWords('coffee in the morning 22 miles to go'));
+  t.feed(FL.normWords('singing to the radio all night long'));
+  r = t.feed(FL.normWords('hold on hold on tonight'));
+  eq(r.line, 8, 'second chorus resolves to the SECOND copy (completes 7, shows 8)');
+
+  // forward skip needs (and gets) a 2-word run
+  t = FL.createTracker(idx);
+  r = t.feed(FL.normWords('hold on hold on tonight'));
+  eq(r.line, 3, 'jump into chorus 1 commits (completes line 2, shows 3)');
+
+  // backward correction needs 3 consecutive matches (unique text)
+  t = FL.createTracker(idx);
+  t.feed(FL.normWords("walking down the road don't look back"));
+  t.feed(FL.normWords('every little thing gonna be alright'));
+  t.feed(FL.normWords('hold on hold'));
+  r = t.feed(FL.normWords('every little'));
+  eq(r.line, 2, 'two backward matches do not move yet');
+  r = t.feed(FL.normWords('thing'));
+  eq(r.line, 1, 'third consecutive backward match commits');
+
+  // seek + silence hold + rejoin
+  t = FL.createTracker(idx);
+  t.seek(4);
+  r = t.feed(FL.normWords('coffee in the morning'));
+  eq(r.line, 4, 'seek re-anchors the tracker');
+  r = t.reset();
+  eq(r.line, 0, 'reset returns to the first line');
+  t = FL.createTracker(idx);
+  t.feed(FL.normWords('walking down the'));
+  eq(t.state().line, 0, 'silence holds the line');
+  r = t.feed(FL.normWords('road dont look'));
+  eq(r.line, 0, 'rejoin after silence continues the line');
 })();
 
 /* ============ report ============ */

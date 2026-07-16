@@ -13,7 +13,7 @@ var css = read('css/style.css');
 var scripts = ['js/chordtheory.js', 'js/parser.js', 'js/voicings.js',
                'js/diagrams.js', 'js/triads.js', 'js/subs.js', 'js/fretboard.js',
                'js/search.js', 'js/store.js',
-               'js/filestore.js', 'js/app.js'];
+               'js/filestore.js', 'js/follow.js', 'js/app.js'];
 
 html = html.replace('<link rel="stylesheet" href="css/style.css">',
   '<style>\n' + css + '\n</style>');
