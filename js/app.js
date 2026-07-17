@@ -524,8 +524,10 @@
     return '<div class="scale-col" id="scale-col">' +
       '<div class="ts-zone-head">' +
       '<span class="ts-lab">Scales:</span>' +
+      '<div class="tgroup keygrp sc-kindgrp">' +
       '<button class="sc-kind-btn" data-act="scales-kind-menu" ' +
       'title="Choose the scale — click to change">' + esc(SCALE_KIND_NAMES[kind]) + '</button>' +
+      '</div>' +
       '<button class="icon sc-collapse" data-act="toggle-scales" ' +
       'title="Hide scales">›</button></div>' +
       '<div class="sc-names"><span class="sc-name">' + esc(primaryTitle) +
@@ -2332,14 +2334,32 @@
         updateFollowBtn();
         break;
       }
-      case 'toggle-diagrams':
-        Store.setSetting('showDiagrams', !Store.getSettings().showDiagrams);
+      case 'toggle-diagrams': {
+        var sd = Store.getSettings();
+        if (sd.showDiagrams && !sd.stripCollapsed) {
+          Store.setSetting('stripCollapsed', true);   // active again: collapse
+        } else {
+          Store.setSetting('showDiagrams', true);     // switch modes, expand
+          Store.setSetting('showTriads', false);
+          Store.setSetting('stripCollapsed', false);
+        }
         render();
+        scheduleFit();
         break;
-      case 'toggle-triads':
-        Store.setSetting('showTriads', !Store.getSettings().showTriads);
+      }
+      case 'toggle-triads': {
+        var st2 = Store.getSettings();
+        if (st2.showTriads && !st2.stripCollapsed) {
+          Store.setSetting('stripCollapsed', true);
+        } else {
+          Store.setSetting('showTriads', true);
+          Store.setSetting('showDiagrams', false);
+          Store.setSetting('stripCollapsed', false);
+        }
         render();
+        scheduleFit();
         break;
+      }
       case 'triad-pos':
         Store.setSetting('triadPos', actEl.getAttribute('data-v'));
         if (st.view === 'practice') updatePractice(); else updateTriadStrip();

@@ -79,7 +79,7 @@ button.primary { background: var(--accent); color: var(--accent-text); border-co
 button.danger { color: var(--danger); }
 /* glyph buttons: text icons (◐ ⚙ ☰ ✎ ⎙ ↑ ✕ ‹) render small at the base
    13px — scale them all to fill the box like the 🗑 emoji does */
-button.icon { padding: 5px 8px; line-height: 1; font-size: 16.5px; }
+button.icon { padding: 3px 7px; line-height: 1.25; font-size: 20px; }
 button.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 input[type="text"], input[type="number"], textarea, select {
   font-family: inherit; font-size: 14px; color: var(--text);
@@ -126,7 +126,7 @@ input[type="range"] { accent-color: var(--accent); }
 .sort-row { display: flex; align-items: center; gap: 5px; padding: 8px 0 0; }
 .sort-row .lbl { font-size: 11px; color: var(--text-dim); margin-right: 2px; }
 .sort-row button.mini { font-size: 11.5px; padding: 3px 0; flex: 1; border-radius: 6px; }
-.sort-row button.mini.ico { flex: 0 0 auto; padding: 2px 8px; font-size: 15px; line-height: 1; }
+.sort-row button.mini.ico { flex: 0 0 auto; padding: 1px 8px; font-size: 17px; line-height: 1.2; }
 .sort-row button.mini.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 
 .sidebar-actions { display: flex; gap: 6px; padding: 0 12px 10px; }
@@ -352,7 +352,11 @@ button.tb-mic {
 .chord-svg .cd-mute { stroke: var(--text-dim); }
 .chord-svg .cd-finger { fill: var(--bg-panel); font-weight: 700; }
 .chord-svg .cd-basefret {
-  fill: var(--text-dim);
+  fill: var(--text-dim); font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--text-dim) 45%, transparent);
   /* halo: stays readable if a barre or dot crowds the label */
   paint-order: stroke; stroke: var(--bg-panel); stroke-width: 2px;
 }
@@ -648,6 +652,9 @@ pre.tabline {
   color: var(--accent-text); cursor: pointer;
 }
 .sc-kind-btn:hover { filter: brightness(1.12); border: none; }
+/* inside the key-style group pill, keep the chip blue (the generic
+   .tgroup button rule would strip it) */
+.tgroup .sc-kind-btn { background: var(--accent); padding: 3px 11px; }
 .sc-menu .km-grid { grid-template-columns: 1fr; }
 /* names in their own header row, flush under the label and aligned over the
    two flavor stacks */

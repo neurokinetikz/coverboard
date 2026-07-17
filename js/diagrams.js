@@ -65,7 +65,7 @@
     // a deeper header than the classic charts' small X/ring markers
     var markerRow = roles ? 13 : 9;
     var gridTop = padTop + markerRow;
-    var padLeft = 13, padRight = 22;
+    var padLeft = 24, padRight = 11;
     var gridW = W - padLeft - padRight;
     var gridH = H - gridTop - 8;
     var sx = gridW / (nStrings - 1);   // string spacing
@@ -93,9 +93,11 @@
       out.push('<rect x="' + (padLeft - 1) + '" y="' + (gridTop - 2.4) + '" width="' + (gridW + 2) +
                '" height="2.8" rx="1" class="cd-nut"/>');
     } else {
-      // +7 keeps clear air between a first-row dot on string 1 and the label
-      out.push('<text x="' + (W - padRight + 7) + '" y="' + (gridTop + fy * 0.65) +
-               '" font-size="8.5" class="cd-basefret">' + base + 'fr</text>');
+      // snug 3px gap; back off when a first-row dot sits on the low E
+      var crowdL = frets[0] === base ||
+        (shape.barre && !roles && shape.barre.fret === base && shape.barre.from === 0);
+      out.push('<text x="' + (padLeft - (crowdL ? 8 : 3)) + '" y="' + (gridTop + fy * 0.65) +
+               '" text-anchor="end" font-size="8.5" class="cd-basefret">' + base + 'fr</text>');
     }
 
     // frets
@@ -201,13 +203,13 @@
     // Fretted cards keep the slim header.
     var markerRow = hasOpenRow ? 13 : 3;
     var gridTop = padTop + markerRow;
-    // uniform right gutter for the side fret tag — same grid WIDTH every card
-    var padLeft = 13, padRight = 24;
+    // uniform LEFT gutter for the side fret tag — same grid WIDTH every card
+    var padLeft = 26, padRight = 11;
     var gridW = W - padLeft - padRight;
     var gridH = H - gridTop - 4;
     var sx = gridW / (nStrings - 1);
     var fy = gridH / nFrets;
-    var sxDot = (W - padLeft - 8) / (nStrings - 1);
+    var sxDot = (W - 21) / (nStrings - 1);   // original tuned dot reach
     var dotR = Math.min(sxDot, fy) * 0.36;
 
     function X(s) { return padLeft + s * sx; }
@@ -228,8 +230,11 @@
       out.push('<rect x="' + (padLeft - 1) + '" y="' + (gridTop - 2.4) + '" width="' + (gridW + 2) +
                '" height="2.8" rx="1" class="cd-nut"/>');
     } else {
-      out.push('<text x="' + (W - padRight + 8) + '" y="' + (gridTop + fy * 0.65) +
-               '" font-size="9.5" class="cd-basefret">' + base + 'fr</text>');
+      var crowdL = dots.some(function (d) {
+        return d.string === 0 && d.fret === base;
+      });
+      out.push('<text x="' + (padLeft - (crowdL ? 9 : 3)) + '" y="' + (gridTop + fy * 0.65) +
+               '" text-anchor="end" font-size="9.5" class="cd-basefret">' + base + 'fr</text>');
     }
     for (var f = 0; f <= nFrets; f++) {
       out.push('<line x1="' + padLeft + '" y1="' + fretY(f) + '" x2="' + (padLeft + gridW) +
