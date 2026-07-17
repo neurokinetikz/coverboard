@@ -86,7 +86,14 @@
         while (p < cand.length && p < lastInterim.length &&
                cand[p] === lastInterim[p]) p++;
         var out = cand.slice(p);
-        lastInterim = isFinal ? [] : cand;
+        if (isFinal) {
+          // Chrome may finalize only the FIRST of several pending results;
+          // the leftover interim words were already emitted, so remember
+          // them. A final that diverges from the interim resets cleanly.
+          lastInterim = p === cand.length ? lastInterim.slice(p) : [];
+        } else {
+          lastInterim = cand;
+        }
         return out;
       },
       reset: function () { lastInterim = []; }
@@ -156,6 +163,7 @@
       feed: function (newWords) {
         for (var n = 0; n < newWords.length; n++) {
           var w = newWords[n];
+          var prevCursor = cursor;
           var lo = Math.max(0, cursor - BACK);
           var hi = Math.min(words.length - 1, cursor + AHEAD);
           var best = null;
@@ -163,7 +171,8 @@
             var m = matchScore(w, words[j].w);
             if (!m) continue;
             var d = j - cursor;
-            var s = d >= 0 ? m * (1 - d / (AHEAD * 4)) : m * 0.5;
+            var s = d >= 0 ? m * (1 - d / (AHEAD * 4))
+                           : m * 0.5 * (1 + d / (BACK * 4));
             if (!best || s > best.s) best = { j: j, s: s };
           }
           ring.push(best ? 1 : 0);
@@ -186,7 +195,7 @@
               pending = null;
             }
           }
-          if (cursor > 0) {
+          if (cursor !== prevCursor && cursor > 0) {
             // teleprompter advance: once a line's last word is consumed,
             // highlight the NEXT line the singer is about to start
             if (cursor < words.length &&
@@ -265,13 +274,17 @@
       start: function (opts) {
         if (!SR) return false;
         cbs = opts;
-        rec = new SR();
-        rec.continuous = true;
-        rec.interimResults = true;
-        rec.maxAlternatives = 1;
-        rec.lang = opts.lang ||
+        // capture this session's recognizer: async events from an aborted
+        // instance must be ignored once a new session has replaced it
+        var myRec = new SR();
+        rec = myRec;
+        myRec.continuous = true;
+        myRec.interimResults = true;
+        myRec.maxAlternatives = 1;
+        myRec.lang = opts.lang ||
           (global.navigator && global.navigator.language) || 'en-US';
-        rec.onresult = function (e) {
+        myRec.onresult = function (e) {
+          if (myRec !== rec) return;
           var i, interim = '';
           for (i = e.resultIndex; i < e.results.length; i++) {
             if (e.results[i].isFinal) {
@@ -283,15 +296,20 @@
           }
           if (interim) cbs.onWords(interim, false);
         };
-        rec.onstart = function () { cbs.onState('listening'); };
-        rec.onend = function () {
-          if (!active) return;
+        myRec.onstart = function () {
+          if (myRec !== rec) return;
+          cbs.onState('listening');
+        };
+        myRec.onend = function () {
+          if (myRec !== rec || !active) return;
           cbs.onState('restarting');
           restartTimer = setTimeout(function () {
-            try { rec.start(); } catch (err) { /* already running */ }
+            if (myRec !== rec || !active) return;
+            try { myRec.start(); } catch (err) { /* already running */ }
           }, 250);
         };
-        rec.onerror = function (e) {
+        myRec.onerror = function (e) {
+          if (myRec !== rec) return;
           var code = mapError(e.error);
           if (!code) return;             // benign: the onend restart handles it
           active = false;
@@ -299,7 +317,7 @@
         };
         active = true;
         cbs.onState('starting');
-        try { rec.start(); } catch (err) { active = false; return false; }
+        try { myRec.start(); } catch (err) { active = false; return false; }
         return true;
       },
       stop: function () {
@@ -320,8 +338,8 @@
   function stop() {
     if (!C.active) return;
     C.active = false;
+    if (C.engine) C.engine.stop();   // emits 'stopped' — settle 'idle' after
     C.state = 'idle';
-    if (C.engine) C.engine.stop();
     C.engine = null; C.tracker = null; C.feeder = null;
     var ui = C.ui; C.ui = null; C.line = -1;
     if (ui && ui.onState) ui.onState('idle');
@@ -380,12 +398,44 @@
     var r = C.tracker.seek(lineIdx);
     C.line = lineIdx;
     if (C.ui && C.ui.onLine) C.ui.onLine(lineIdx, r);
+    if (C.ui && C.ui.onWord) C.ui.onWord(r.wordLine, r.word, r);
+  }
+
+  function escapeHTML(str) {
+    return String(str).replace(/[&<>"']/g, function (c) {
+      return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;'
+           : c === '"' ? '&quot;' : '&#39;';
+    });
+  }
+
+  /* Wrap the index-consuming words of a lyric SLICE in <span class="w"
+     data-w="K"> spans (K = word ordinal within the LINE, straight from
+     wordRanges — the same contract buildIndex uses). A word split across
+     two chord segments yields two spans sharing one K. Pure string builder,
+     no DOM. */
+  function wrapWordsHTML(text, offset, ranges) {
+    if (!ranges || !ranges.length || !text) return text ? escapeHTML(text) : '';
+    var end = offset + text.length;
+    var html = '';
+    var pos = offset;
+    for (var k = 0; k < ranges.length; k++) {
+      var r = ranges[k];
+      if (r.e <= pos || r.s >= end) continue;
+      var ws = Math.max(r.s, pos), we = Math.min(r.e, end);
+      if (ws > pos) html += escapeHTML(text.slice(pos - offset, ws - offset));
+      html += '<span class="w" data-w="' + k + '">' +
+        escapeHTML(text.slice(ws - offset, we - offset)) + '</span>';
+      pos = we;
+    }
+    if (pos < end) html += escapeHTML(text.slice(pos - offset));
+    return html;
   }
 
   var api = {
     normWord: normWord,
     normWords: normWords,
     wordRanges: wordRanges,
+    wrapWordsHTML: wrapWordsHTML,
     buildIndex: buildIndex,
     createFeeder: createFeeder,
     createTracker: createTracker,
@@ -396,7 +446,10 @@
     seek: seek,
     active: function () { return C.active; },
     state: function () { return C.state; },
-    currentLine: function () { return C.line; }
+    currentLine: function () { return C.line; },
+    // tracker snapshot ({line, cursor, wordLine, word, confidence}) so the
+    // app can repaint word marks after a full re-render; null when inactive
+    trackerState: function () { return C.tracker ? C.tracker.state() : null; }
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.Follow = api;

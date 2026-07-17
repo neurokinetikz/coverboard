@@ -77,27 +77,11 @@
 
   /* ---------- section / line rendering (shared by song view & preview) ---------- */
 
-  /* Wrap the index-consuming words of a lyric slice in <span class="w"
-     data-w="K"> spans (K = word ordinal within the LINE, from
-     Follow.wordRanges — the same contract buildIndex uses). A word split
-     across two chord segments yields two spans with the same K; marking
-     both halves works fine. */
+  /* Word-span wrapping lives in follow.js (wrapWordsHTML) beside the
+     wordRanges/buildIndex contract it implements, where tests can pin it. */
   function wrapWords(text, offset, ranges) {
-    if (!ranges || !ranges.length || !text) return text ? esc(text) : '';
-    var end = offset + text.length;
-    var html = '';
-    var pos = offset;
-    for (var k = 0; k < ranges.length; k++) {
-      var r = ranges[k];
-      if (r.e <= pos || r.s >= end) continue;
-      var ws = Math.max(r.s, pos), we = Math.min(r.e, end);
-      if (ws > pos) html += esc(text.slice(pos - offset, ws - offset));
-      html += '<span class="w" data-w="' + k + '">' +
-        esc(text.slice(ws - offset, we - offset)) + '</span>';
-      pos = we;
-    }
-    if (pos < end) html += esc(text.slice(pos - offset));
-    return html;
+    if (FL && FL.wrapWordsHTML) return FL.wrapWordsHTML(text, offset, ranges);
+    return text ? esc(text) : '';
   }
 
   function segHTML(chordSym, text, clickable, isAnnot, offset, ranges) {
@@ -587,6 +571,8 @@
     applyFontSize();
     if (FL && FL.active() && FL.currentLine() >= 0) {
       applyFollowLine(FL.currentLine());   // survive full re-renders
+      var fts = FL.trackerState && FL.trackerState();
+      if (fts && fts.wordLine >= 0) applyFollowWord(fts.wordLine, fts.word);
     }
     var q = $('#search-input');
     if (q) {
@@ -1506,6 +1492,7 @@
       var song;
       if (isEdit) song = Store.updateSong(existing.id, fields);
       else song = Store.addSong(fields);
+      if (FL && FL.active()) followStop();   // tracker index is now stale
       App.indexDirty = true;
       App.state.view = 'song';
       App.state.songId = song.id;
@@ -2141,24 +2128,23 @@
         'start-failed': 'Could not start listening'
       };
       toast(msgs[code] || 'Follow mode error: ' + code);
-      var sc = $('#song-scroll');
-      var prev = sc && $('.sung-cur', sc);
-      if (prev) prev.classList.remove('sung-cur');
+      clearFollowMarks();
     }
   };
 
+  function clearFollowMarks() {
+    var sc = $('#song-scroll');
+    if (!sc) return;
+    var prev = $('.sung-cur', sc);
+    if (prev) prev.classList.remove('sung-cur');
+    var ws = sc.querySelectorAll('.w.sung');
+    for (var i = 0; i < ws.length; i++) ws[i].classList.remove('sung');
+  }
+
   function followStop() {
-    if (FL && FL.active()) {
-      FL.stop();
-      var sc = $('#song-scroll');
-      if (sc) {
-        var prev = $('.sung-cur', sc);
-        if (prev) prev.classList.remove('sung-cur');
-        var ws = sc.querySelectorAll('.w.sung');
-        for (var i = 0; i < ws.length; i++) ws[i].classList.remove('sung');
-      }
-      updateFollowBtn();
-    }
+    if (FL && FL.active()) FL.stop();
+    clearFollowMarks();
+    updateFollowBtn();
   }
 
   function autoStop() {
@@ -2289,10 +2275,11 @@
         openSong(id);
         break;
       case 'new-song': importModal(null); break;
-      case 'edit-song': importModal(Store.getSong(st.songId)); break;
+      case 'edit-song': followStop(); importModal(Store.getSong(st.songId)); break;
       case 'delete-song': {
         var song = Store.getSong(st.songId);
         if (song && confirm('Delete “' + song.title + '”?')) {
+          followStop();
           Store.deleteSong(song.id);
           App.indexDirty = true;
           st.songId = null;

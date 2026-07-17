@@ -10,6 +10,21 @@ var Store = require('../js/store.js');
 var T = require('../js/triads.js');
 var FB = require('../js/fretboard.js');
 var SB = require('../js/subs.js');
+/* fake recognizer installed before follow.js loads so the real webspeech
+   engine registers against it — enables engine/controller tests in node */
+function FakeSR() {
+  this.continuous = false; this.interimResults = false;
+  this.lang = ''; this.maxAlternatives = 1;
+  this.onresult = this.onend = this.onerror = this.onstart = null;
+  this.started = 0; this.aborted = 0;
+  FakeSR.instances.push(this);
+  var self = this;
+  this.start = function () { self.started++; if (self.onstart) self.onstart(); };
+  this.abort = function () { self.aborted++; };
+  this.stop = function () {};
+}
+FakeSR.instances = [];
+globalThis.SpeechRecognition = FakeSR;
 var FL = require('../js/follow.js');
 
 var passed = 0, failed = 0, failures = [];
@@ -1508,6 +1523,149 @@ function deepEq(a, b, name) {
   eq(t.state().line, 0, 'silence holds the line');
   r = t.feed(FL.normWords('road dont look'));
   eq(r.line, 0, 'rejoin after silence continues the line');
+
+  /* ---- review fixes: tracker ---- */
+
+  // repeated lyrics: a backward run must resolve to the NEAREST occurrence
+  var rep = FL.buildIndex({ sections: [{ lines: [
+    { kind: 'lyric', lyric: 'hold the line' },
+    { kind: 'lyric', lyric: 'love isnt always on time' },
+    { kind: 'lyric', lyric: 'hold the line' },
+    { kind: 'lyric', lyric: 'love isnt always on time' }
+  ] }] });
+  t = FL.createTracker(rep);
+  t.feed(FL.normWords('hold the line love isnt always on time hold the line love isnt always on time'));
+  eq(t.state().cursor, 16, 'repeated song fully consumed');
+  r = t.feed(FL.normWords('always on time'));
+  eq(r.cursor, 16, 'backward tie resolves to nearest occurrence (no jump)');
+  eq(r.line, 3, 'highlight stays on the last line');
+
+  // pending (uncommitted) matches must not move the highlight
+  var wl = FL.buildIndex(Parser.parseSong('hello world foo bar baz\n***\nnext line here', {}));
+  eq(wl.lineCount, 3, 'wordless qualifying line consumes an index line');
+  eq(wl.words[wl.words.length - 1].line, 2, 'line after wordless keeps DOM numbering');
+  t = FL.createTracker(wl);
+  r = t.seek(1);
+  eq(r.line, 1, 'seek anchors on the wordless line');
+  r = t.feed(['baz']);                    // backward-only match: pending, no commit
+  eq(r.line, 1, 'uncommitted match leaves the highlight where the user put it');
+  eq(r.cursor, 5, 'cursor unmoved by pending match');
+
+  /* ---- review fixes: feeder ---- */
+
+  // Chrome finalizes result 0 while result 1 stays interim: the already-
+  // emitted interim tail must not re-feed
+  f = FL.createFeeder();
+  deepEq(f.push('hello darkness my old friend ive come', false),
+    ['hello', 'darkness', 'my', 'old', 'friend', 'ive', 'come'], 'split-final: interim all fed');
+  deepEq(f.push('hello darkness my old', true), [], 'split-final: partial final adds nothing');
+  deepEq(f.push('friend ive come to', false), ['to'],
+    'split-final: surviving interim words are NOT re-fed');
+  // a final sharing only a word prefix with the NEXT utterance stays fresh
+  f = FL.createFeeder();
+  f.push('hold on tonight', true);
+  deepEq(f.push('hold my hand', false), ['hold', 'my', 'hand'],
+    'post-final interim sharing a prefix with the final is fully fed');
+
+  /* ---- engine + controller (fake recognizer) ---- */
+
+  var fixParsed = Parser.parseSong('Hello darkness my old friend\nIve come to talk with you again', {});
+  var ev = [];
+  var ui = {
+    onLine: function (n) { ev.push('line:' + n); },
+    onWord: function (l, w) { ev.push('word:' + l + ':' + w); },
+    onState: function (st) { ev.push('state:' + st); },
+    onError: function (c) { ev.push('error:' + c); }
+  };
+  FakeSR.instances.length = 0;
+  eq(FL.start(fixParsed, ui), true, 'controller start succeeds with fake SR');
+  var rec1 = FakeSR.instances[0];
+  eq(FL.active(), true, 'controller active');
+  eq(ev.indexOf('line:0') >= 0, true, 'start pre-announces the first line');
+  rec1.onresult({ resultIndex: 0, results: [Object.assign(
+    [{ transcript: 'hello darkness my old friend ive' }], { isFinal: false, length: 1 })] });
+  eq(FL.currentLine(), 1, 'teleprompter advanced to line 1 via engine events');
+  var ts = FL.trackerState();
+  eq(ts.wordLine, 1, 'trackerState exposes word line');
+  eq(ts.word, 0, 'trackerState exposes word ordinal');
+  eq(ev.indexOf('word:1:0') >= 0, true, 'onWord fired through the controller');
+  // stale-session guard: a superseded recognizer's events must not leak
+  ev.length = 0;
+  FL.start(fixParsed, ui);                // controller restarts (stop+start)
+  var rec2 = FakeSR.instances[1];
+  eq(rec1.aborted, 1, 'old recognizer aborted on restart');
+  var evLen = ev.length;
+  rec1.onend();                           // stale async onend arrives late
+  rec1.onresult({ resultIndex: 0, results: [Object.assign(
+    [{ transcript: 'ghost words' }], { isFinal: true, length: 1 })] });
+  eq(ev.length, evLen, 'stale recognizer events are ignored by the new session');
+  // onend on the LIVE recognizer schedules a restart
+  var timers = [];
+  var realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = function (fn) { timers.push(fn); return 0; };
+  rec2.onend();
+  globalThis.setTimeout = realSetTimeout;
+  eq(timers.length, 1, 'live onend schedules the auto-restart');
+  timers[0]();
+  eq(rec2.started, 2, 'auto-restart starts the same recognizer');
+  // seek repaints words so stale karaoke marks clear
+  ev.length = 0;
+  FL.seek(0);
+  eq(ev.indexOf('line:0') >= 0, true, 'seek announces the line');
+  eq(ev.indexOf('word:-1:-1') >= 0, true, 'seek fires onWord for mark cleanup');
+  // stop settles on idle even though the engine emits stopped
+  FL.stop();
+  eq(FL.state(), 'idle', 'controller state is idle after stop');
+  eq(FL.trackerState(), null, 'trackerState null when inactive');
+  // fatal engine error stops the controller and surfaces the code
+  FakeSR.instances.length = 0;
+  FL.start(fixParsed, ui);
+  ev.length = 0;
+  FakeSR.instances[0].onerror({ error: 'network' });
+  eq(FL.active(), false, 'fatal engine error stops the controller');
+  eq(ev.indexOf('error:network') >= 0, true, 'error code surfaces to the UI');
+  FL.stop();
+
+  /* ---- wrapWordsHTML: the DOM half of the word contract ---- */
+
+  var lyr = "Walking down the road, don't look back";
+  var wr = FL.wordRanges(lyr);
+  eq(FL.wrapWordsHTML(lyr, 0, wr),
+    '<span class="w" data-w="0">Walking</span> <span class="w" data-w="1">down</span> ' +
+    '<span class="w" data-w="2">the</span> <span class="w" data-w="3">road,</span> ' +
+    '<span class="w" data-w="4">don&#39;t</span> <span class="w" data-w="5">look</span> ' +
+    '<span class="w" data-w="6">back</span>',
+    'whole line wraps every counted word');
+  // a word straddling a chord-segment boundary: both halves share data-w
+  eq(FL.wrapWordsHTML(lyr.slice(0, 9), 0, wr),
+    '<span class="w" data-w="0">Walking</span> <span class="w" data-w="1">d</span>',
+    'left slice ends mid-word with the word ordinal');
+  eq(FL.wrapWordsHTML(lyr.slice(9), 9, wr),
+    '<span class="w" data-w="1">own</span> <span class="w" data-w="2">the</span> ' +
+    '<span class="w" data-w="3">road,</span> <span class="w" data-w="4">don&#39;t</span> ' +
+    '<span class="w" data-w="5">look</span> <span class="w" data-w="6">back</span>',
+    'right slice resumes the SAME data-w for the straddled word');
+  eq(FL.wrapWordsHTML('<b>&"x"', 0, FL.wordRanges('<b>&"x"')),
+    '<span class="w" data-w="0">&lt;b&gt;&amp;&quot;x&quot;</span>',
+    'wrapWordsHTML escapes lyric text');
+  eq(FL.wrapWordsHTML('***', 0, FL.wordRanges('***')), '***'.replace(/\*/g, '*'),
+    'uncounted tokens pass through escaped, unwrapped');
+
+  /* ---- parser kind inventory (pins the data-line blacklist) ---- */
+
+  // sectionsHTML emits data-line for chordlyric/lyric via a switch default;
+  // buildIndex whitelists the same two. If the parser ever grows a NEW kind,
+  // this pin fails loudly so both sides get re-checked.
+  var kinds = {};
+  var kitchen = Parser.parseSong(
+    '{title: X}\n[Verse]\nC        G\nWalking down\nC G Am\ne|--0--|\n# a comment\n\nplain lyric', {});
+  kitchen.sections.forEach(function (sec) {
+    (sec.lines || []).forEach(function (ln) { kinds[ln.kind] = true; });
+  });
+  var known = ['chordlyric', 'lyric', 'chords', 'tab', 'comment', 'blank'];
+  Object.keys(kinds).forEach(function (k) {
+    eq(known.indexOf(k) >= 0, true, 'parser kind "' + k + '" is in the known inventory');
+  });
 })();
 
 /* ============ report ============ */
