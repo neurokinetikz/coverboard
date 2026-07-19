@@ -127,14 +127,11 @@ the DOM glue the Node suite can't see.
 
 ## Privacy
 
-Everything is local: no server, no account, no network calls, with two
-narrow exceptions. While **Follow mode** is listening, audio is processed by
-the browser's built-in speech service — the mic never activates unless you
-tap it. And the **hosted instance** uses [Plausible](https://plausible.io)
-for anonymous, cookie-less page counts (no personal data, no cross-site
-tracking). The analytics tag is injected only at deploy time — this source
-tree, the single-file build, forks, and self-hosted copies contain no
-analytics code at all.
+Everything is local: your songs live in your browser (plus the optional
+linked file); there is no server and no account. While **Follow mode** is
+listening, audio is processed by the browser's built-in speech service — the
+mic never activates unless you tap it. This source tree, the single-file
+build, and self-hosted copies contain no analytics code.
 
 ## Contributing
 
