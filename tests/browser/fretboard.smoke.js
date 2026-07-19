@@ -17,6 +17,12 @@ H.launch({ viewport: { width: 1710, height: 1112 } }).then(async function (env) 
   });
   await page.reload();
   await page.waitForSelector('.fb-controls');
+  // wait for the rAF positioner to place the chart groups (raced under load)
+  await page.waitForFunction(function () {
+    var g = document.querySelector('.fb-posgroup');
+    return g && g.style.top !== '';
+  });
+  await page.waitForTimeout(150);
 
   // controls bar on top (two lines), neck + charts row below
   var geo = await page.evaluate(function () {
