@@ -1,4 +1,4 @@
-/* app.js — Songbook UI. Depends on chordtheory, parser, voicings, diagrams,
+/* app.js — Coverboard UI. Depends on chordtheory, parser, voicings, diagrams,
    search, store (loaded before this script). */
 (function () {
   'use strict';
@@ -775,7 +775,7 @@
     return '<div class="sidebar" id="sidebar">' +
       fsBanner +
       '<div class="sidebar-head">' +
-        '<div class="brand"><span class="logo">🎸</span> Songbook <span style="margin-left:auto"></span>' +
+        '<div class="brand"><span class="logo">🎸</span> Coverboard <span style="margin-left:auto"></span>' +
           '<button class="icon" data-act="toggle-theme" title="Toggle light/dark">◐</button></div>' +
         '<div class="searchbox"><span class="mag">⌕</span>' +
           '<input type="text" id="search-input" placeholder="Search title, artist, lyrics, chords…"></div>' +

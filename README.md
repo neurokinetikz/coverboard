@@ -1,17 +1,18 @@
-# Songbook
+# Coverboard
 
-A fast, local songbook app — paste chords straight from Ultimate Guitar and get
-a clean, color-highlighted chord sheet with diagrams. Then go deeper: built-in
-triad/CAGED tools, a fretboard explorer, and theory-aware chord substitutions
-turn every song in your library into a lesson.
+Your covers, on the board. A fast, local guitar songbook — paste chords
+straight from Ultimate Guitar and get a clean, color-highlighted chord sheet
+with diagrams. Then go deeper: built-in triad/CAGED tools, a fretboard
+explorer, and theory-aware chord substitutions turn every cover you know into
+a lesson on the neck.
 
 No account, no server, no dependencies. Your library lives in your browser,
 with optional sync to a local file.
 
 ## Run it
 
-Open `index.html` in a browser. Or use `dist/songbook.html` — the entire app in
-a single file you can copy anywhere. Rebuild it with `node build.js`.
+Open `index.html` in a browser. Or use `dist/coverboard.html` — the entire app
+in a single file you can copy anywhere. Rebuild it with `node build.js`.
 
 ## Import
 

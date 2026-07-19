@@ -1,7 +1,7 @@
 {
-  "name": "songbook",
+  "name": "coverboard",
   "private": true,
-  "description": "Self-contained songbook app. The app itself has zero dependencies; playwright-core is dev-only, for the browser test battery (needs Chrome installed).",
+  "description": "Coverboard — a local-first guitar songbook that teaches you the neck. The app itself has zero dependencies; playwright-core is dev-only, for the browser test battery (needs Chrome installed).",
   "scripts": {
     "test": "node tests/run.js",
     "test:browser": "node tests/browser/all.js",

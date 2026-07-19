@@ -1,4 +1,4 @@
-/* build.js — inlines css + js into a single self-contained dist/songbook.html.
+/* build.js — inlines css + js into a single self-contained dist/coverboard.html.
    Run: node build.js */
 'use strict';
 var fs = require('fs');
@@ -34,4 +34,4 @@ if (html.indexOf('src="js/') !== -1) {
 
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
 fs.writeFileSync(path.join(root, 'dist', 'songbook.html'), html);
-console.log('dist/songbook.html written (' + (html.length / 1024).toFixed(0) + ' KB)');
+console.log('dist/coverboard.html written (' + (html.length / 1024).toFixed(0) + ' KB)');
