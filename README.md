@@ -1,255 +1,138 @@
 # Songbook
 
-A fast, local songbook app — paste chords straight from Ultimate Guitar and get a
-clean, color-highlighted chord sheet with chord diagrams. Then go deeper: built-in
-triad/CAGED practice tools, a full-neck fretboard explorer, and theory-aware chord
-substitutions turn every song in your library into a lesson.
+A fast, local songbook app — paste chords straight from Ultimate Guitar and get
+a clean, color-highlighted chord sheet with diagrams. Then go deeper: built-in
+triad/CAGED tools, a fretboard explorer, and theory-aware chord substitutions
+turn every song in your library into a lesson.
 
-No account, no server, no subscription, no dependencies; your library lives in your
-browser (with optional sync to a local file).
+No account, no server, no dependencies. Your library lives in your browser,
+with optional sync to a local file.
 
 ## Run it
 
-Open `index.html` in any modern browser (double-click works — no server needed).
+Open `index.html` in a browser. Or use `dist/songbook.html` — the entire app in
+a single file you can copy anywhere. Rebuild it with `node build.js`.
 
-Or use the single-file build: `dist/songbook.html` is the whole app in one file —
-copy it to a phone/tablet, email it to yourself, put it anywhere.
-Rebuild it after changes with `node build.js`.
+## Import
 
-## The import flow
-
-1. Hit **＋ New** and paste anything:
-   - Ultimate Guitar CHORDS pages (chords-over-lyrics, `[Verse 1]` headers)
-   - UG raw markup (`[tab]`/`[ch]` tags are stripped automatically)
-   - ChordPro files (`{title:}`, inline `[C]lyrics`)
-   - Plain lyrics
-2. Title / artist / capo / key are auto-detected. A live preview shows the parsed,
-   color-highlighted result as you paste.
-3. Save. Done.
-
-Section headers in any style — `[Chorus]`, `Chorus:`, `CHORUS`, `(Bridge)`,
-`Pre-Chorus 2`, `Middle 8` — are recognized and color-coded by type
-(verse=blue, chorus=amber, pre-chorus=teal, bridge=pink, intro=purple, solo=orange,
-instrumental=green, outro=gray). Tap a section header to collapse it.
-
-## Follow mode
-
-Tap **🎤** next to the song title, start singing, and the app follows you:
-the current line highlights (teleprompter-style — it advances the moment you
-finish a line) and the words light up as you sing them, karaoke-style.
-Outside Fit mode the highlighted line scrolls into view. Tap any lyric line
-while listening to re-sync. It never listens unless you turn it on.
-
-Under the hood this is *alignment*, not transcription: the lyrics are known,
-so even the noisy recognition you get while strumming is plenty to track
-position. The current engine is the browser's built-in speech recognition —
-which means **Chrome, an internet connection, and your audio being processed
-by the browser's speech service** while following. If the mic is blocked when
-opening `index.html` directly from disk, serve it locally instead:
-`python3 -m http.server` then `http://localhost:8000`.
+Hit **＋ New** and paste anything: Ultimate Guitar pages or raw `[tab]`/`[ch]`
+markup, ChordPro, plain lyrics. Title, artist, capo, and key are auto-detected,
+with a live preview as you paste. Section headers in any style are recognized
+and color-coded by type; tap one to collapse it.
 
 ## Learn: triads & CAGED
 
-Toggle **△ Triads** in the song toolbar and the diagram strip switches to
-**triad charts** — every chord in the song reduced to its playable three-note
-shape, with each note color-coded by interval role:
+Toggle **△ Triads** and the diagram strip shows every chord reduced to its
+playable three-note shape, color-coded by interval role — root blue, 3rd amber,
+5th green, 7th/6th purple. The colors follow function and stay consistent
+across every view, so shapes become readable at a glance. (The ◫ Chords strip
+keeps classic black-and-white fingerings.)
 
-> ● root (blue) · ● 3rd (amber) · ● 5th (soft green) · ● 7th/6th (purple)
+- **Position** — pick one of the key's five CAGED positions and every chord is
+  voiced inside that window, so you can play the whole song without moving.
+  Widened or broken positions are flagged, never hidden.
+- **Voicing** — `Closed` triads, or `Open` spread triads for a bigger,
+  ringing comping sound.
+- **Strings** — pick a string set, or **Near**: each triad voiced closest to
+  the previous one, so the progression connects with minimal hand movement.
 
-The colors follow function, not a rainbow: blue = home (the root), soft
-green = the safe landing (the 5th), warm amber = the identity note (the 3rd —
-or the sus 2/4 that replaces it), purple = the color a 7th adds, gray = context
-(altered 5ths keep the 5th color — the ♭5/♯5 label carries the tension). Scale ghosts carry a faint tint of their family;
-passing tones stay gray. The ◫ Chords strip keeps classic ink-and-fingers
-charts — colors live in the learning views.
-
-Three controls drive the strip:
-
-- **Position** — `Any` or one of the five CAGED positions of the song's key
-  (`G·Open | E·3fr | D·5fr | C·7fr | A·10fr` in G). Pick one and *every chord*
-  is voiced inside that neck window, so you can play the whole song without
-  leaving the position. When a chord has no strict in-window voicing, the
-  engine widens by a fret and says so (`±1fr`), or flags a genuine position
-  break (`off-pos`) — it never lies.
-- **Voicing** — `Closed` (three voices within an octave, adjacent strings) or
-  `Open`: spread triads with the middle voice raised an octave across a skipped
-  string — the big, ringing sound for comping in a band. The Strings selector
-  switches to the spread groupings (`1-3-4 | 2-4-5 | 3-5-6`) and everything
-  else — positions, Near, substitutions, practice mode — follows the family.
-- **Strings** — which string set to practice on (`1-3 | 2-4 | 3-5 | 4-6`, or the
-  spread groupings in Open mode), or **Near**: a voice-leading chain where each
-  triad is voiced *closest to the previous chord's* — common tones stay put, the
-  string set floats, and the whole progression connects with minimal hand
-  movement inside the position. Hold a position and cycle the sets, hold a set
-  and walk the positions, or switch to Near and hear the chords melt into each
-  other.
-
-Chords richer than a triad reduce honestly:
-
-| you wrote | chart shows | why |
-|---|---|---|
-| `C7` `C9` `C13` | R·3·♭7 shell | guide tones define a dominant; the 9/13 is the first note a trio drops |
-| `Am7` `Am9` | R·♭3·♭7 shell | same idea, minor |
-| `Cmaj7` `Cmaj9` | R·3·7 shell | natural-7 shell |
-| `C6` / `Cm6` | R·3·6 shell | pitch-identical to the relative minor's shape — half the lesson |
-| `Cadd9` | plain triad | a closed R·3·9 on adjacent strings is an unplayable cluster |
-| `Dm7b5` → `Ddim`, `E7#5` → `Eaug`, `D/F#` → `D` | badged | the origin symbol shows above the chart |
-
-Transpose the song and the strip follows, including the position labels.
+7ths and 6ths reduce to honest three-note shells (guide tones win), slash
+chords and rarities are badged with their origin symbol, and transposing keeps
+everything — including position labels — in sync.
 
 ## Learn: fretboard explorer
 
-**Fretboard** in the sidebar (or "Explore neck →" from the strip) opens the
-neck the way you actually see it: **vertical, nut at the top, low E on the
-left** — the same orientation as every chord chart. Pick any root (sharp and
-flat spellings are separate buttons — tapping `F♯` vs `G♭` spells everything
-accordingly) and any quality (maj, min, 7, m7, maj7, 6, m6, dim, aug, sus2,
-sus4). You get:
+**Fretboard** opens the neck vertically — nut at top, low E on the left, the
+same orientation as the chord charts. Pick any root and quality and you get
+every chord tone across 15 frets (interval or note-name labels), voicing
+charts grouped by CAGED position and aligned beside their frets, an optional
+pentatonic/full-scale ghost layer, string-set and inversion filters, and a
+CAGED overlay.
 
-- every chord tone across 15 frets, labeled by **interval** (default) or note name
-- the discrete voicing charts **beside the neck, grouped by CAGED position and
-  aligned with their frets** — the 3fr voicings sit next to fret 3; the whole
-  layout sizes itself to fill your screen. Tap any chart to open substitutions
-- a **scale layer** (`none | pentatonic | full scale`) — scale tones as small ghost
-  dots behind the chord tones, so you see the triad-inside-the-box relationship;
-  chord-correct flavors (minor pent / major pent; Mixolydian for 7ths, Dorian for m6)
-- a **string set + inversion filter** that narrows the cloud to actual closed voicings
-- an optional **CAGED overlay** shading the five position windows as bands
-
-And in the song view: a **scales column** pins to the right edge — all five
-CAGED positions, nut first, in two stacks (the key's flavor and its parallel,
-each named once at the top). A key-style selector picks the scale:
-**Pentatonic** (the classic boxes), **Full scale** (the 7-note
-major/natural-minor CAGED patterns), or **Mixolydian · Dorian** (the modal
-workhorses — Mixolydian over major/dominant vamps, Dorian over minor).
-Tonics in root-blue, the selected
-triad position highlighted, cards grow with your screen, and the whole column
-collapses to a slim rail when you want the width back — and the chart strip
-itself collapses to a matching rail at the top. Tap any card to open the
-explorer with everything pre-set.
-
-## Learn: practice mode
-
-**▶ Practice** in the triad strip opens the drill the whole feature builds toward:
-*play the entire song in one position*. A full neck is locked to your chosen CAGED
-position — the pentatonic box as ghost dots, the **current chord's triad**
-role-labeled inside it, the **next chord's triad** faint so your hand knows where
-it's going. The space bar steps the song's *actual progression* (consecutive
-repeats collapsed); a chip rail below shows where you are, section by section.
-
-Keys: `space`/`→` next · `←` back · `Home` restart · `1–5` or `[` `]` switch
-position · `esc` back to the song. Master a position, press `2`, do it again —
-then mix positions in performance.
+In the song view, a **scales column** pins all five positions of the key's
+scale to the right edge — Pentatonic, Full scale, or Mixolydian · Dorian —
+with the parallel flavor alongside. Tap any card to open the explorer pre-set.
 
 ## Learn: chord substitutions
 
-Click any chord — in the lyrics, either diagram strip, or the explorer — and the
-modal answers one question: **"what else could I play right here?"** The chart
-you clicked sits on top; below it, up to six substitution candidates, each voiced
-*near the same position on the same string set*, each with a one-line why:
+Click any chord anywhere and the modal answers one question: **"what else
+could I play right here?"** Up to six candidates — same function, relative,
+tritone sub, secondary dominant, borrowed, color — each voiced near the same
+position, each with a one-line why ("relative minor — keeps G·B"). Tap a
+candidate to chain deeper.
 
-- **Same function** — diatonic swaps (C→Em/Am; in minor keys iv→iiø, v→V7…)
-- **Relative** major/minor
-- **Tritone sub** — only for genuinely dominant-function chords (G7→D♭7)
-- **Secondary dominant** — reads the actual progression (Dm→D7 when D heads to G)
-- **Borrowed** — iv, ♭VI, backdoor ♭VII in major; Picardy and Dorian IV in minor
-- **Color** — same-root upgrades (C→Cmaj7/Cadd9/C6/Csus4)
+## Follow mode
 
-Reasons show shared tones ("relative minor — keeps G·B") with chord-correct
-spelling (Amaj7 adds G♯, never A♭). Tap a candidate to make it the focus and
-chain deeper; `‹` walks back.
+Tap **🎤**, start singing, and the app follows you: the current line
+highlights teleprompter-style and the words light up karaoke-style as you sing
+them. Tap any line to re-sync. It never listens unless you turn it on.
+
+Under the hood this is alignment, not transcription — the lyrics are known, so
+the noisy recognition you get while strumming is plenty. The engine is the
+browser's built-in speech recognition (Chrome, online; audio is processed by
+the browser's speech service). If the mic is blocked on `file://`, serve
+locally: `python3 -m http.server`.
 
 ## Everything else
 
-- **Search** — instant, fuzzy, across titles, artists, lyrics, and chords.
-- **Chord diagrams** — the ◫ Chords strip shows a voicing for every song chord;
-  curated fingerings for the classics, generated for the rest. Charts shrink to
-  keep any song's chords on one centered row.
-- **Transpose** — ± semitones with correct flat/sharp spelling for the target key.
-- **Fit mode** — ⛶ fits the entire song on screen in auto-sized columns
-  (binary-searches the largest font that fits). Toggle off for scroll + autoscroll.
-- **Autoscroll** — spacebar toggles a smooth scroll (speed persists in settings).
-- **Setlists** — build, reorder, and Perform (arrow keys flip between songs).
-- **Library file sync** — link a local JSON file (Settings ⚙) and every change
-  streams to it; a browser-data wipe can never lose your songs. Newer side wins
-  on reconnect.
-- **Export / Import** — JSON backup of the whole library (Settings ⚙).
-- **Themes** — dark/light (◐ in the sidebar); all charts and role colors adapt.
-- **Collapsible sidebar** — ☰ slides the library away on desktop (persisted),
-  and is the drawer toggle on narrow screens.
-- **Print** — clean printable sheets: chrome hidden, ink-safe chart colors even
-  from dark mode, strips wrap instead of clipping.
-- **Tabs** — tab blocks (`e|---3---`) are preserved verbatim in monospace.
+- **Search** — instant and fuzzy across titles, artists, lyrics, chords
+- **Transpose** — with correct flat/sharp spelling for the target key
+- **Fit mode** — the whole song on screen in auto-sized columns; or scroll +
+  spacebar autoscroll
+- **Setlists** — build, reorder, perform (arrow keys)
+- **Library file sync** — link a local JSON file and every change streams to it
+- **Export / Import** — JSON backup of the whole library
+- **Dark/light themes**, collapsible sidebar, clean **print** output, verbatim
+  **tab** blocks
 
 ## Architecture
 
-Plain ES5-style scripts on `window`, loaded in dependency order — no framework,
-no bundler, runs from `file://`. UI state lives in one object with full re-render;
-events are delegated through `data-act` attributes.
+Plain ES5 scripts on `window`, no framework, no bundler, runs from `file://`.
+One state object, full re-render, `data-act` event delegation.
 
 | module | role |
 |---|---|
 | `js/chordtheory.js` | note/chord parsing, transposition, key detection |
 | `js/parser.js` | UG/ChordPro/freeform song text → sections/lines/chords |
-| `js/voicings.js` | full chord voicings: curated shapes + search-based generator |
-| `js/diagrams.js` | chord chart SVG renderer (interval-role coloring optional) |
-| `js/triads.js` | triad/shell engine: closed voicings per string set × rotation, CAGED position model, position-constrained picker |
-| `js/subs.js` | substitution engine: six rule families with major/minor key tables |
-| `js/fretboard.js` | full-neck SVG renderer for the explorer |
+| `js/voicings.js` | chord voicings: curated shapes + generator |
+| `js/diagrams.js` | chord chart SVG renderer |
+| `js/triads.js` | triad/shell engine + CAGED position model |
+| `js/subs.js` | substitution engine |
+| `js/fretboard.js` | full-neck SVG renderer |
+| `js/follow.js` | Follow mode: aligner, tracker, engine seam |
 | `js/search.js` | fuzzy library search |
 | `js/store.js` | localStorage persistence, settings, parse cache |
 | `js/filestore.js` | File System Access sync to a linked library file |
-| `js/app.js` | all UI: views, strips, modals, routing, event delegation |
+| `js/app.js` | all UI: views, strips, modals, routing |
 
-Everything except `app.js`/`filestore.js` is pure and Node-testable. New modules
-follow the same pattern: IIFE exporting to `window` + CommonJS, registered in
-both `index.html` and `build.js` (the build fails loudly if they drift).
+Everything except `app.js`/`filestore.js` is pure and Node-testable.
 
 ## Tests
 
 ```
-node tests/run.js
+node tests/run.js                          # 1500+ assertions, pure Node
+npm install && node tests/browser/all.js   # headless-Chrome battery
 ```
 
-1524 assertions across the parser, chord theory, voicing generator, triad/CAGED
-engine (including hand-verified fret literals), substitution rule tables, both
-SVG renderers, and the full Follow-mode stack (aligner, feeder, tracker, and
-the engine/controller driven by a fake recognizer). Pure Node — no browser or
-DOM required.
-
-### Browser battery
-
-```
-npm install          # once — playwright-core (dev-only; the app has no deps)
-node tests/browser/all.js
-```
-
-Drives the real app in headless Chrome (must be installed): the Follow-mode
-e2e with a scripted fake recognizer (line + word tracking, teleprompter
-advance, tap-to-seek, teardown), the exclusive Chords/Triads toggles,
-back/forward routing, responsive layout (scales-column hug, viewport-scaled
-strip cards, fit-mode reflow, print sizing), and the vertical fretboard
-(orientation, position-aligned chart groups, fit-to-height). This covers the
-app.js DOM glue and CSS layout that the Node suite structurally cannot see.
-Each file in `tests/browser/` also runs standalone.
+The Node suite covers the parser, chord theory, voicings, the triad/CAGED
+engine, substitutions, both SVG renderers, and the full Follow-mode stack
+(driven by a fake recognizer). The browser battery drives the real app —
+Follow e2e, toggles, routing, responsive layout, the fretboard view — covering
+the DOM glue the Node suite can't see.
 
 ## Privacy
 
-Everything is local: songs live in your browser (plus the optional linked
-file), there is no server, no account, no analytics, no network calls — with
-one explicit exception: while **Follow mode** is listening, audio is processed
-by the browser's built-in speech service (Chrome sends it to Google's
-recognizer). The mic never activates unless you tap it.
+Everything is local: no server, no account, no analytics, no network calls —
+with one exception: while **Follow mode** is listening, audio is processed by
+the browser's built-in speech service. The mic never activates unless you tap
+it.
 
 ## Contributing
 
-`node tests/run.js` must stay green (pure Node, no browser); `npm install &&
-node tests/browser/all.js` runs the headless-Chrome battery. New modules are
-plain IIFEs exporting to `window` + CommonJS, registered in both `index.html`
-and `build.js` (the build asserts if they drift). Follow mode's recognition
-layer is a swappable seam — alternative engines implement
-`registerEngine({id, available, start, stop})` in `js/follow.js` and
-everything above it (alignment, karaoke, UI) just works.
+Keep `node tests/run.js` green. New modules are plain IIFEs exporting to
+`window` + CommonJS, registered in both `index.html` and `build.js` (the build
+asserts if they drift). Follow mode's recognition layer is a swappable seam —
+see `registerEngine` in `js/follow.js`.
 
 ## License
 
