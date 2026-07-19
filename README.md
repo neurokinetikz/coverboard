@@ -132,8 +132,9 @@ narrow exceptions. While **Follow mode** is listening, audio is processed by
 the browser's built-in speech service — the mic never activates unless you
 tap it. And the **hosted instance** uses [Plausible](https://plausible.io)
 for anonymous, cookie-less page counts (no personal data, no cross-site
-tracking); self-hosted copies and the single-file build load no analytics at
-all — the loader only activates on the official hostname.
+tracking). The analytics tag is injected only at deploy time — this source
+tree, the single-file build, forks, and self-hosted copies contain no
+analytics code at all.
 
 ## Contributing
 

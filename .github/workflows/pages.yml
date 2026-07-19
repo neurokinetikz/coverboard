@@ -1,0 +1,44 @@
+# Deploys the app to GitHub Pages. If the repository defines an
+# ANALYTICS_HEAD secret, its contents are injected into <head> at deploy
+# time — the source tree, forks, and self-hosted copies contain no
+# analytics of any kind.
+name: pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inject analytics head (hosted deploy only)
+        env:
+          ANALYTICS_HEAD: ${{ secrets.ANALYTICS_HEAD }}
+        run: |
+          if [ -n "$ANALYTICS_HEAD" ]; then
+            node -e '
+              const fs = require("fs");
+              let h = fs.readFileSync("index.html", "utf8");
+              h = h.replace("</head>", process.env.ANALYTICS_HEAD + "\n</head>");
+              fs.writeFileSync("index.html", h);
+            '
+            echo "analytics head injected"
+          else
+            echo "no ANALYTICS_HEAD secret — deploying clean"
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4
