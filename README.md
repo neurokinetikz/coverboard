@@ -130,8 +130,7 @@ the DOM glue the Node suite can't see.
 Everything is local: your songs live in your browser (plus the optional
 linked file); there is no server and no account. While **Follow mode** is
 listening, audio is processed by the browser's built-in speech service — the
-mic never activates unless you tap it. This source tree, the single-file
-build, and self-hosted copies contain no analytics code.
+mic never activates unless you tap it.
 
 ## Contributing
 

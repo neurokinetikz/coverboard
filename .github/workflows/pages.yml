@@ -1,7 +1,6 @@
-# Deploys the app to GitHub Pages. If the repository defines an
-# ANALYTICS_HEAD secret, its contents are injected into <head> at deploy
-# time — the source tree, forks, and self-hosted copies contain no
-# analytics of any kind.
+# Deploys the app to GitHub Pages. If the repository defines an ANALYTICS_HEAD
+# secret, its contents are appended to <head> at deploy time; without it
+# the deploy is byte-identical to the source tree.
 name: pages
 on:
   push:
@@ -22,7 +21,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Inject analytics head (hosted deploy only)
+      - name: Inject extra head content (if configured)
         env:
           ANALYTICS_HEAD: ${{ secrets.ANALYTICS_HEAD }}
         run: |
@@ -33,9 +32,9 @@ jobs:
               h = h.replace("</head>", process.env.ANALYTICS_HEAD + "\n</head>");
               fs.writeFileSync("index.html", h);
             '
-            echo "analytics head injected"
+            echo "extra head content injected"
           else
-            echo "no ANALYTICS_HEAD secret — deploying clean"
+            echo "no ANALYTICS_HEAD secret — deploying source as-is"
           fi
       - uses: actions/upload-pages-artifact@v3
         with:
