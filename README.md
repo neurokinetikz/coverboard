@@ -11,7 +11,7 @@ with optional sync to a local file.
 
 ## Run it
 
-**Use it now: [neurokinetikz.github.io/coverboard](https://neurokinetikz.github.io/coverboard)** —
+**Use it now: [coverboard.neurokinetikz.com](https://coverboard.neurokinetikz.com)** —
 nothing to install, your library stays in your browser.
 
 Or run it yourself: open `index.html` in a browser, or grab
