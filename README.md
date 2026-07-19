@@ -11,8 +11,12 @@ with optional sync to a local file.
 
 ## Run it
 
-Open `index.html` in a browser. Or use `dist/coverboard.html` — the entire app
-in a single file you can copy anywhere. Rebuild it with `node build.js`.
+**Use it now: [neurokinetikz.github.io/coverboard](https://neurokinetikz.github.io/coverboard)** —
+nothing to install, your library stays in your browser.
+
+Or run it yourself: open `index.html` in a browser, or grab
+`dist/coverboard.html` — the entire app in a single file you can copy anywhere.
+Rebuild it with `node build.js`.
 
 ## Import
 
