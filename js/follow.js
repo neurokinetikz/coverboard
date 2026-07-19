@@ -3,8 +3,8 @@
      1. a PURE aligner (normalize / index / feed / track) — no DOM, no audio,
         fully testable in Node;
      2. an engine seam — pluggable speech recognizers that emit RAW text
-        (v1: the browser's Web Speech API; a future offline on-device engine
-        registers here and everything above it is untouched);
+        (v1: the browser's Web Speech API; alternative engines register here
+        and everything above them is untouched);
      3. a controller singleton that wires engine → feeder → tracker → UI
         callbacks supplied by the app (follow.js never touches the DOM).
    Plain script; exports to window and CommonJS. */
@@ -237,8 +237,7 @@
                      -> bool,
                    stop() }.
      Engines emit RAW transcript text; all normalization and diffing live in
-     the pure layers above, so a future offline on-device engine only has to
-     produce text. Priority order in bestEngine() — prepend new engines. */
+     the pure layers above, so a new engine only has to produce text. Priority order in bestEngine() — prepend new engines. */
   var engines = {};
   var ENGINE_ORDER = ['webspeech'];
 

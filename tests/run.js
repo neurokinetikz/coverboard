@@ -195,7 +195,7 @@ function deepEq(a, b, name) {
   eq(song.sections[3].type, 'outro', 'Outro: type');
 
   // header lookalikes that must NOT be headers
-  var s2 = Parser.parseSong('C\nHello darkness my old friend\nAnother lyric line here', {});
+  var s2 = Parser.parseSong('C\nHello twilight my old town\nAnother lyric line here', {});
   eq(s2.sections.length, 1, 'plain lyrics stay in one section');
   var kinds = s2.sections[0].lines.map(function (l) { return l.kind; });
   deepEq(kinds, ['chordlyric', 'lyric'], 'C paired with first lyric, second stays lyric');
@@ -1377,7 +1377,7 @@ function deepEq(a, b, name) {
 
   // --- windowed view (startFret) ---
   var svg3 = FB.renderNeckSVG({
-    startFret: 5, fretCount: 10, width: 500, height: 110, showStringNames: false,
+    startFret: 5, fretCount: 10, width: 110, height: 500, showStringNames: false,
     dots: [
       { string: 2, fret: 6, role: 'R' },     // in window
       { string: 2, fret: 4, role: '3' },     // below window — dropped
@@ -1385,15 +1385,28 @@ function deepEq(a, b, name) {
     ],
     windows: [{ from: 3, to: 9 }]
   });
-  // padL=10, gridW=480, fw=96 -> fret 6 dot centered at 10 + 0.5*96 = 58
-  ok(svg3.indexOf('cx="58"') !== -1, 'windowed dot positioned relative to startFret');
+  // padT=10, gridH=480, fh=96 -> fret 6 dot centered at 10 + 0.5*96 = 58
+  ok(svg3.indexOf('cy="58"') !== -1, 'windowed dot positioned relative to startFret');
   eq((svg3.match(/fb-dot /g) || []).length, 1, 'out-of-window and open dots dropped');
   ok(svg3.indexOf('fb-nut') === -1, 'no nut above the nut');
   ok(svg3.indexOf('>7<') !== -1 && svg3.indexOf('>9<') !== -1, 'absolute fret numbers kept');
   ok(svg3.indexOf('>3<') === -1 && svg3.indexOf('>12<') === -1, 'out-of-window numbers dropped');
-  ok(svg3.indexOf('x="-') === -1, 'window rect clamped to grid (no negative x)');
+  ok(svg3.indexOf('y="-') === -1 && svg3.indexOf('x="-') === -1,
+     'window rect clamped to grid (no negative coords)');
   ok(svg3.indexOf('NaN') === -1, 'no NaN in windowed view');
   ok(svg3.indexOf('fb-stringname') === -1, 'string names suppressed');
+
+  // --- vertical orientation pins (defaults 250x980: padL=34, padT=48) ---
+  var svg5 = FB.renderNeckSVG({ dots: [
+    { string: 0, fret: 3, role: 'R' },     // low E: leftmost string, cx = 34
+    { string: 5, fret: 3, role: '5' },     // high e: cx = 34 + 5*38 = 224
+    { string: 0, fret: 0, role: 'R' }      // open: top gutter, cy = 48-16 = 32
+  ] });
+  ok(svg5.indexOf('cx="34"') !== -1 && svg5.indexOf('cx="224"') !== -1,
+     'strings vertical: low E leftmost, high e rightmost');
+  ok(svg5.indexOf('cy="32"') !== -1, 'open dot sits above the nut');
+  ok(svg5.indexOf('width="190" height="3.5"') !== -1,
+     'nut is a horizontal bar at the top');
 
   // ghosts: small, never labeled
   var svg4 = FB.renderNeckSVG({
@@ -1417,7 +1430,7 @@ function deepEq(a, b, name) {
   // 9 lyric-index lines: v1 (0,1), chorus1 (2,3), coffee (4), '# lead
   // break' parses as a lyric line (5), singing (6), chorus2 (7,8) — the
   // tab line is skipped. Choruses are verbatim repeats.
-  var raw = "[Verse 1]\nC        G\nWalking down the road, don't look back\nAm       F\nEvery little thing gonna be alright\n[Chorus]\nC        G\nHold on, hold on tonight\nAm       F\nWe are burning brighter now\n[Verse 2]\nC        G\nCoffee in the morning, 22 miles to go\n# lead break\ne|--0--2--3--|\nAm       F\nSinging to the radio all night long\n[Chorus]\nC        G\nHold on, hold on tonight\nAm       F\nWe are burning brighter now";
+  var raw = "[Verse 1]\nC        G\nWalking down the road, don't look back\nAm       F\nEvery lantern glowing down the street\n[Chorus]\nC        G\nHold on, hold on tonight\nAm       F\nWe are burning brighter now\n[Verse 2]\nC        G\nCoffee in the morning, 22 miles to go\n# lead break\ne|--0--2--3--|\nAm       F\nSinging to the radio all night long\n[Chorus]\nC        G\nHold on, hold on tonight\nAm       F\nWe are burning brighter now";
   var parsed = Parser.parseSong(raw, {});
   var idx = FL.buildIndex(parsed);
 
@@ -1438,8 +1451,8 @@ function deepEq(a, b, name) {
           { s: 17, e: 24 }], 'wordRanges gives char offsets per counted token');
   deepEq(FL.wordRanges('... -- !'), [], 'pure-punctuation tokens consume no range');
   ok(idx.words.some(function (w) { return w.w === 'dont'; }), 'dont indexed');
-  eq(idx.words.filter(function (w) { return w.w === 'alright'; })[0].line, 1,
-     'alright maps to line 1');
+  eq(idx.words.filter(function (w) { return w.w === 'street'; })[0].line, 1,
+     'street maps to line 1');
   eq(idx.words.filter(function (w) { return w.w === 'coffee'; })[0].line, 4,
      'coffee maps to line 4 (indices survive tab/comment interleave)');
   eq(idx.words.filter(function (w) { return w.w === 'singing'; })[0].line, 6,
@@ -1467,7 +1480,7 @@ function deepEq(a, b, name) {
   eq(r.line, 1, 'completing a line advances the highlight to the next');
   eq(r.wordLine, 0, 'wordLine trails on the completed line');
   eq(r.word, 6, 'last consumed word is the line-final word');
-  r = t.feed(FL.normWords('every little thing gonna be alright'));
+  r = t.feed(FL.normWords('every lantern glowing down the street'));
   eq(r.line, 2, 'completing line 1 advances to the chorus');
   t.seek(8);
   r = t.feed(FL.normWords('we are burning brighter now'));
@@ -1504,11 +1517,11 @@ function deepEq(a, b, name) {
   // backward correction needs 3 consecutive matches (unique text)
   t = FL.createTracker(idx);
   t.feed(FL.normWords("walking down the road don't look back"));
-  t.feed(FL.normWords('every little thing gonna be alright'));
+  t.feed(FL.normWords('every lantern glowing down the street'));
   t.feed(FL.normWords('hold on hold'));
-  r = t.feed(FL.normWords('every little'));
+  r = t.feed(FL.normWords('every lantern'));
   eq(r.line, 2, 'two backward matches do not move yet');
-  r = t.feed(FL.normWords('thing'));
+  r = t.feed(FL.normWords('glowing'));
   eq(r.line, 1, 'third consecutive backward match commits');
 
   // seek + silence hold + rejoin
@@ -1528,15 +1541,15 @@ function deepEq(a, b, name) {
 
   // repeated lyrics: a backward run must resolve to the NEAREST occurrence
   var rep = FL.buildIndex({ sections: [{ lines: [
-    { kind: 'lyric', lyric: 'hold the line' },
-    { kind: 'lyric', lyric: 'love isnt always on time' },
-    { kind: 'lyric', lyric: 'hold the line' },
-    { kind: 'lyric', lyric: 'love isnt always on time' }
+    { kind: 'lyric', lyric: 'hold the rope' },
+    { kind: 'lyric', lyric: 'moonlight keeps shining on water' },
+    { kind: 'lyric', lyric: 'hold the rope' },
+    { kind: 'lyric', lyric: 'moonlight keeps shining on water' }
   ] }] });
   t = FL.createTracker(rep);
-  t.feed(FL.normWords('hold the line love isnt always on time hold the line love isnt always on time'));
+  t.feed(FL.normWords('hold the rope moonlight keeps shining on water hold the rope moonlight keeps shining on water'));
   eq(t.state().cursor, 16, 'repeated song fully consumed');
-  r = t.feed(FL.normWords('always on time'));
+  r = t.feed(FL.normWords('shining on water'));
   eq(r.cursor, 16, 'backward tie resolves to nearest occurrence (no jump)');
   eq(r.line, 3, 'highlight stays on the last line');
 
@@ -1556,10 +1569,10 @@ function deepEq(a, b, name) {
   // Chrome finalizes result 0 while result 1 stays interim: the already-
   // emitted interim tail must not re-feed
   f = FL.createFeeder();
-  deepEq(f.push('hello darkness my old friend ive come', false),
-    ['hello', 'darkness', 'my', 'old', 'friend', 'ive', 'come'], 'split-final: interim all fed');
-  deepEq(f.push('hello darkness my old', true), [], 'split-final: partial final adds nothing');
-  deepEq(f.push('friend ive come to', false), ['to'],
+  deepEq(f.push('walking under silver skies tonight my friend', false),
+    ['walking', 'under', 'silver', 'skies', 'tonight', 'my', 'friend'], 'split-final: interim all fed');
+  deepEq(f.push('walking under silver skies', true), [], 'split-final: partial final adds nothing');
+  deepEq(f.push('tonight my friend now', false), ['now'],
     'split-final: surviving interim words are NOT re-fed');
   // a final sharing only a word prefix with the NEXT utterance stays fresh
   f = FL.createFeeder();
@@ -1569,7 +1582,7 @@ function deepEq(a, b, name) {
 
   /* ---- engine + controller (fake recognizer) ---- */
 
-  var fixParsed = Parser.parseSong('Hello darkness my old friend\nIve come to talk with you again', {});
+  var fixParsed = Parser.parseSong('Morning sunlight over silver hills\nWaiting for another day to come around', {});
   var ev = [];
   var ui = {
     onLine: function (n) { ev.push('line:' + n); },
@@ -1583,7 +1596,7 @@ function deepEq(a, b, name) {
   eq(FL.active(), true, 'controller active');
   eq(ev.indexOf('line:0') >= 0, true, 'start pre-announces the first line');
   rec1.onresult({ resultIndex: 0, results: [Object.assign(
-    [{ transcript: 'hello darkness my old friend ive' }], { isFinal: false, length: 1 })] });
+    [{ transcript: 'morning sunlight over silver hills waiting' }], { isFinal: false, length: 1 })] });
   eq(FL.currentLine(), 1, 'teleprompter advanced to line 1 via engine events');
   var ts = FL.trackerState();
   eq(ts.wordLine, 1, 'trackerState exposes word line');

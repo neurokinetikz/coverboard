@@ -339,7 +339,9 @@ button.tb-mic {
 .diagram-strip { flex-wrap: nowrap; justify-content: center; overflow-x: auto; position: relative; }
 .diagram-strip .dg {
   cursor: pointer; border-radius: 8px; padding: 2px;
-  flex: 0 1 170px; min-width: 55px;
+  /* cards scale with the viewport: full size on big monitors, smaller on
+     laptops so the strip yields vertical space to the lyrics */
+  flex: 0 1 clamp(70px, 12vmin, 170px); min-width: 55px;
 }
 .diagram-strip .dg:hover { background: var(--bg-inset); }
 .diagram-strip .chord-svg { width: 100%; height: auto; display: block; }
@@ -581,7 +583,7 @@ pre.tabline {
 }
 .ts-tile {
   display: flex; flex-direction: column; align-items: center; gap: 1px;
-  flex: 0 1 170px; min-width: 55px;
+  flex: 0 1 clamp(70px, 12vmin, 170px); min-width: 55px;
 }
 .ts-orig { font-size: 10px; font-weight: 600; color: var(--text-dim); line-height: 1.2; }
 /* the chart SVG carries ~10px of internal bottom padding — pull the caption
@@ -746,17 +748,45 @@ html[data-theme="dark"]  { --fb-r: #4d8dff; --fb-3: #f6a13c; --fb-5: #6ee08e; --
 .fb-crow .mini.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .fb-crow .mini:disabled { opacity: 0.45; cursor: default; }
 .fb-hint { font-size: 12px; color: var(--text-dim); margin-left: 6px; }
+#fb-body { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; }
+.fb-main { display: flex; gap: 16px; flex: 1 1 auto; min-height: 0; align-items: stretch; justify-content: center; }
 .fb-wrap {
   background: var(--bg-panel); border: 1px solid var(--border);
   border-radius: 12px; padding: 10px;
+  flex: 0 0 auto;
 }
-.fb-wrap svg { width: 100%; height: auto; display: block; }
+.fb-wrap svg { height: 100%; width: auto; display: block; aspect-ratio: 250 / 980; }
+.fb-rest { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; }
+/* voicing charts grouped by CAGED position, each group aligned with its
+   band on the neck (tops set by positionFbGroups) */
+.fb-poscol {
+  flex: 0 0 auto; position: relative; min-height: 0;
+  width: 460px;   /* pre-JS default; positionFbGroups sets the real width */
+}
+.fb-posgroup {
+  position: absolute; left: 0; right: 0; top: 0;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.fb-poslab {
+  font-size: 11px; font-weight: 700; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.fb-posrow { display: flex; gap: 4px; flex-wrap: wrap; align-items: flex-start; }
+.fb-poscol .fbv .chord-svg { width: var(--fbv-w, 138px); height: auto; aspect-ratio: 96 / 102; }
+.fb-posempty { color: var(--text-dim); font-size: 12px; padding: 2px 0 6px; }
 .fb-svg .fb-string, .fb-svg .fb-fret { stroke: var(--text-dim); }
 .fb-svg .fb-fret { opacity: 0.55; }
 .fb-svg .fb-nut { fill: var(--text); }
 .fb-svg .fb-inlay { fill: var(--border); }
 .fb-svg .fb-fretnum, .fb-svg .fb-stringname { fill: var(--text-dim); }
-.fb-svg .fb-fretnum { paint-order: stroke; stroke: var(--bg-panel); stroke-width: 3px; }
+.fb-svg .fb-fretnum {
+  paint-order: stroke; stroke: var(--bg-panel); stroke-width: 3px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--text-dim) 45%, transparent);
+}
 .fb-dot.fb-r circle { fill: var(--fb-r); }
 .fb-dot.fb-3 circle { fill: var(--fb-3); }
 .fb-dot.fb-5 circle { fill: var(--fb-5); }
@@ -786,7 +816,7 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
 }
 .fb-voicings {
   display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start;
-  justify-content: center; margin-top: 12px;
+  justify-content: flex-start; margin-top: 12px;
 }
 .fbv { display: flex; flex-direction: column; align-items: center; gap: 1px; }
 .fbv .dg { cursor: pointer; border-radius: 8px; padding: 2px; }
@@ -808,14 +838,19 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
 .pr-next { margin-left: auto; font-size: 13px; color: var(--text-dim); }
 .pr-next b { color: var(--text); font-size: 19px; margin-left: 4px; }
 .pr-navbtn { font-size: 16px; }
+#practice-body { display: flex; gap: 16px; height: 100%; min-height: 0; }
 .pr-neck {
   background: var(--bg-panel); border: 1px solid var(--border);
   border-radius: 12px; padding: 10px;
+  flex: 0 0 auto;
 }
-.pr-neck svg { width: 100%; height: auto; display: block; }
+.pr-neck svg { height: 100%; width: auto; display: block; aspect-ratio: 250 / 980; }
+.pr-rest { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .pr-rail {
-  display: flex; gap: 4px; align-items: center;
-  overflow-x: auto; padding: 12px 2px 6px;
+  display: flex; gap: 4px; align-items: flex-start;
+  flex-wrap: wrap; align-content: flex-start;
+  flex: 1 1 auto; overflow-y: auto; overflow-x: hidden;
+  padding: 12px 2px 6px;
 }
 .pr-sec {
   flex: 0 0 auto; font-size: 9.5px; font-weight: 700; text-transform: uppercase;
@@ -837,6 +872,10 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
 }
 @media (max-width: 760px) {
   .sidebar { position: fixed; z-index: 40; height: 100%; transform: translateX(-100%); transition: transform 0.2s; }
+  /* phones: controls stack above the neck at a fixed comfortable height */
+  #fb-body, #practice-body, .fb-main { flex-direction: column; height: auto; }
+  .fb-rest, .pr-rest { order: -1; overflow: visible; }
+  .fb-wrap svg, .pr-neck svg { height: 72vh; width: auto; margin: 0 auto; }
   .sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,0.4); }
   .import-grid { grid-template-columns: 1fr; }
   .song-body { padding: 12px 12px 40vh; }
@@ -857,9 +896,16 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
   .ts-flag { display: none; }
   /* paper has no horizontal scroll — let strips wrap when printing */
   .ts-tiles, .diagram-strip { flex-wrap: wrap; overflow: visible; }
+  /* paper vmin would shrink cards — keep printed charts full size */
+  .diagram-strip .dg, .ts-tile { flex-basis: 170px; }
   /* dark-theme tokens stay active during print — force ink-on-paper for the
      SVG charts (role-colored dots keep their colors via higher specificity) */
   .chord-svg .cd-name, .chord-svg .cd-nut, .chord-svg .cd-dot { fill: #000; }
+  /* vertical neck: one page, centered; app's fixed-height flex released */
+  #fb-body, #practice-body, .fb-main { display: block; height: auto; }
+  .fb-wrap, .pr-neck { break-inside: avoid; }
+  .fb-wrap svg, .pr-neck svg { height: 240mm; width: auto; margin: 0 auto; }
+  .pr-controls, .pr-hint, .pr-navbtn { display: none !important; }
   .chord-svg .cd-fret, .chord-svg .cd-string { stroke: #555; }
   .chord-svg .cd-open { stroke: #000; }
   .chord-svg .cd-mute { stroke: #555; }

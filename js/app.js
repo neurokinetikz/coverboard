@@ -547,6 +547,7 @@
     var tr = song.transpose || 0;
     var flat = songPreferFlat(song, parsed, tr);
     el.outerHTML = scaleColHTML(song, parsed, tr, flat);
+    scheduleFit();   // outerHTML wiped the inline hug width — re-measure
   }
 
   /* Swap just the strip (keeps the song's scroll position mid-practice). */
@@ -576,6 +577,7 @@
       var fts = FL.trackerState && FL.trackerState();
       if (fts && fts.wordLine >= 0) applyFollowWord(fts.wordLine, fts.word);
     }
+    requestAnimationFrame(positionFbGroups);   // no-op outside fretboard view
     var q = $('#search-input');
     if (q) {
       q.value = App.state.query;
@@ -640,7 +642,44 @@
     body.style.columnCount = best.cols;
   }
 
-  function scheduleFit() { requestAnimationFrame(fitSong); }
+  /* Hug the scales column to its charts: the cards are height-limited on
+     short viewports, so the column narrows until the two chart stacks sit
+     flush and the lyrics reclaim the width. Constants mirror style.css
+     .scale-col / .sc-grid / .sc-flavor / .ts-scale metrics — the CSS
+     clamp(230px, 30vw, 420px) stays as the first-paint fallback and as the
+     hard bounds here. */
+  function sizeScaleCol() {
+    var el = $('#scale-col');
+    if (!el || el.classList.contains('collapsed')) return;
+    var grid = $('.sc-grid', el);
+    if (!grid || !grid.clientHeight) return;      // hidden ≤900px, or empty
+    var flavor = $('.sc-flavor', el);
+    var cards = flavor ? flavor.querySelectorAll('.ts-scale').length : 0;
+    if (!cards) return;
+    var cap = $('.ts-scale .ts-cap', el);
+    var capH = cap ? cap.offsetHeight : 15;
+    // per-card neck height: rigid 14px stack gaps, caption, card pad 2+3,
+    // neck/caption gap 2
+    var neckH = (grid.clientHeight - (cards - 1) * 14) / cards - capH - 7;
+    if (neckH < 30) return;
+    var chartW = neckH * (104 / 96);              // renderScaleSVG aspect
+    // horizontal chrome: col pad 24 + border 1 + card side pads 20 +
+    // flavor gap 10 + divider border/pad 11
+    var w = Math.floor(2 * chartW + 66);
+    var maxW = Math.min(420, Math.max(230, Math.round(window.innerWidth * 0.30)));
+    w = Math.max(230, Math.min(w, maxW));
+    if (Math.abs(el.getBoundingClientRect().width - w) >= 2) {
+      el.style.flex = '0 0 ' + w + 'px';
+    }
+  }
+
+  function scheduleFit() {
+    requestAnimationFrame(function () {
+      sizeScaleCol();          // first: lyrics measure the final width
+      fitSong();
+      positionFbGroups();      // no-op outside the fretboard view
+    });
+  }
 
   window.addEventListener('resize', debounce(scheduleFit, 120));
 
@@ -1062,33 +1101,34 @@
     }
     var controls =
       '<div class="fb-controls">' +
-      '<div class="fb-crow"><span class="lbl">Root</span>' + rootBtns + '</div>' +
-      '<div class="fb-crow"><span class="lbl">Quality</span>' +
+      '<div class="fb-crow">' +
+        '<span class="lbl">Root</span>' + rootBtns +
+        '<span class="lbl">Quality</span>' +
         fbSeg('fb-quality', [
           { v: 'maj', l: 'maj' }, { v: 'min', l: 'min' },
           { v: '7', l: '7' }, { v: 'm7', l: 'm7' }, { v: 'maj7', l: 'maj7' },
           { v: '6', l: '6' }, { v: 'm6', l: 'm6' },
           { v: 'dim', l: 'dim' }, { v: 'aug', l: 'aug' },
           { v: 'sus2', l: 'sus2' }, { v: 'sus4', l: 'sus4' }
-        ], ex.quality) + '</div>' +
-      '<div class="fb-crow"><span class="lbl">Strings</span>' +
+        ], ex.quality) +
+      '</div>' +
+      '<div class="fb-crow">' +
+        '<span class="lbl">Strings</span>' +
         fbSeg('fb-strings', [
           { v: 'all', l: 'All' }, { v: '123', l: '1-3' }, { v: '234', l: '2-4' },
           { v: '345', l: '3-5' }, { v: '456', l: '4-6' }
-        ], ex.stringSet) + '</div>' +
-      '<div class="fb-crow"><span class="lbl">Inversion</span>' +
+        ], ex.stringSet) +
+        '<span class="lbl">Inversion</span>' +
         fbSeg('fb-inv', [
           { v: 'any', l: 'Any' }, { v: '0', l: 'Root' }, { v: '1', l: '1st' }, { v: '2', l: '2nd' }
         ], ex.inversion, !setObj) +
         (!setObj ? '<span class="fb-hint">pick a string set to filter inversions</span>' : '') +
-      '</div>' +
-      '<div class="fb-crow"><span class="lbl">Scale</span>' +
+        '<span class="lbl">Scale</span>' +
         fbSeg('fb-scale', [
           { v: 'none', l: 'None' }, { v: 'pent', l: 'Pentatonic' }, { v: 'full', l: 'Full scale' }
         ], ex.scale, !scaleOk) +
         (!scaleOk ? '<span class="fb-hint">pick a maj/min-rooted quality</span>' : '') +
-      '</div>' +
-      '<div class="fb-crow"><span class="lbl">Show</span>' +
+        '<span class="lbl">Show</span>' +
         fbSeg('fb-labels', [{ v: 'intervals', l: 'Intervals' }, { v: 'names', l: 'Notes' }], ex.labels) +
         '<button class="mini' + (ex.caged && cagedOk ? ' active' : '') +
           '" data-act="fb-caged"' + (cagedOk ? '' : ' disabled') +
@@ -1101,22 +1141,70 @@
       fretCount: maxFret, dots: dots, windows: windows, ariaLabel: ariaTitle
     }) + '</div>';
 
-    var chartsHtml = '';
+    function chartCard(v) {
+      return '<span class="fbv"><span class="dg" data-triad="' + esc(title) +
+        '" data-frets="' + v.frets.join(',') + '" title="Tap to enlarge">' +
+        DG.renderChordSVG(v, { label: title, showFingers: false, roles: triadRoles(v) }) + '</span>' +
+        '<span class="fbv-cap">' + esc(triadInvName(v.inversion)) + '</span></span>';
+    }
+
+    // voicing charts grouped by CAGED position, one group-row per position
+    // beside the neck (nut-first, tracking the window bands top to bottom)
+    var posColHtml = '', restCharts = '';
+    var posList = cagedOk ? TR.positionsForKey(ex.rootPc, minorish, { maxFret: maxFret }) : [];
+    // group spec: CAGED positions (PRIMARY windows only — never wrap
+    // instances: a 13fr C-shape belongs beside the D·10fr band, not up at
+    // the nut), or generic fret bands for dim/aug/sus qualities
+    function primaryWindow(pp) {
+      for (var wi = 0; wi < pp.windows.length; wi++) {
+        var w = pp.windows[wi];
+        if (w[0] <= pp.frame + 2 && pp.frame + 2 <= w[1]) return w;
+      }
+      return pp.windows[0];
+    }
+    var groupSpec = posList.length
+      ? posList.map(function (pp) {
+          var w = primaryWindow(pp);
+          return { label: triadPosLabel(pp), from: w[0], center: (w[0] + w[1]) / 2 };
+        })
+      : [0, 3, 6, 9, 12].map(function (f) {
+          return { label: f === 0 ? 'Open' : f + 'fr', from: f, center: f + 1.5 };
+        });
     if (!charts.length && setObj) {
       var invName = ex.inversion === 'any' ? '' :
         (ex.inversion === '0' ? 'root-position ' : ex.inversion === '1' ? '1st-inversion ' : '2nd-inversion ');
-      chartsHtml = '<div class="empty-hint">No closed ' + invName + esc(title) +
+      restCharts = '<div class="empty-hint">No closed ' + invName + esc(title) +
         ' voicings on strings ' + setObj.id + ' within 15 frets.</div>';
     } else if (charts.length) {
-      chartsHtml = '<div class="fb-voicings">' + charts.slice(0, 24).map(function (v) {
-        return '<span class="fbv"><span class="dg" data-triad="' + esc(title) +
-          '" data-frets="' + v.frets.join(',') + '" title="Tap to enlarge">' +
-          DG.renderChordSVG(v, { label: title, showFingers: false, roles: triadRoles(v) }) + '</span>' +
-          '<span class="fbv-cap">' + esc(triadInvName(v.inversion)) + '</span></span>';
+      // assign each voicing by FRET LOCATION: centrality vs band centers
+      var posGroups = groupSpec.map(function () { return []; });
+      charts.slice(0, 24).forEach(function (v) {
+        var fr = v.frets.filter(function (f) { return f > 0; });
+        var avg = fr.length
+          ? fr.reduce(function (a, b) { return a + b; }, 0) / fr.length : 0;
+        var best = 0, bestScore = Infinity;
+        groupSpec.forEach(function (g, i) {
+          var score = Math.abs(avg - g.center);
+          if (score < bestScore) { bestScore = score; best = i; }
+        });
+        posGroups[best].push(v);
+      });
+      // data-top: the band's top edge as a fraction of the neck's 980-unit
+      // viewBox — mirrors renderNeckSVG geometry (padT 48, fh 922/15);
+      // positionFbGroups() aligns each group to it after layout
+      posColHtml = '<div class="fb-poscol">' + groupSpec.map(function (g, i) {
+        var y1 = g.from === 0 ? 18 : 48 + (g.from - 1) * (922 / 15);
+        return '<div class="fb-posgroup" data-top="' + (y1 / 980).toFixed(4) + '">' +
+          '<span class="fb-poslab">' + esc(g.label) + '</span>' +
+          (posGroups[i].length
+            ? '<div class="fb-posrow">' + posGroups[i].map(chartCard).join('') + '</div>'
+            : '<span class="fb-posempty">—</span>') +
+          '</div>';
       }).join('') + '</div>';
     }
 
-    return controls + neck + chartsHtml;
+    return controls + '<div class="fb-main">' + neck + posColHtml +
+      (restCharts ? '<div class="fb-rest">' + restCharts + '</div>' : '') + '</div>';
   }
 
   function fretboardHTML() {
@@ -1132,6 +1220,60 @@
     var host = $('#fb-body');
     if (host) host.innerHTML = fbBodyHTML();
     else render();
+    requestAnimationFrame(positionFbGroups);
+  }
+
+  /* Align each CAGED chart group with its band on the neck: ideal top =
+     data-top × viewport height, cascaded down so groups never overlap.
+     Everything must FIT vertically — when the aligned stack overflows, the
+     cards shrink (smaller cards also pack more per row) until it fits. */
+  function positionFbGroups() {
+    var body = $('#fb-body');
+    var col = body && $('.fb-poscol', body);
+    if (!col) return;
+    var groups = col.querySelectorAll('.fb-posgroup');
+    if (!groups.length) return;
+    var base = col.clientHeight;      // poscol stretches to the fb-main row
+    if (!base) return;
+    var fr = [], i;
+    for (i = 0; i < groups.length; i++) {
+      fr[i] = parseFloat(groups[i].getAttribute('data-top') || '0');
+    }
+    // the CHARTS (not the label) align with the band top: offset by label h
+    function cascade(apply) {
+      var y = 0, bottom = 0, drift = 0;
+      for (i = 0; i < groups.length; i++) {
+        var ideal = Math.max(0, fr[i] * base - 16);
+        var t = Math.max(ideal, y);
+        drift = Math.max(drift, t - ideal);
+        if (apply) groups[i].style.top = t + 'px';
+        y = t + groups[i].offsetHeight + 8;
+        bottom = y - 8;
+      }
+      return { bottom: bottom, drift: drift };
+    }
+    // column wide enough that the biggest group fits ONE row (up to 4-up) —
+    // row wrapping is what shoves groups below their bands
+    var maxCards = 1;
+    for (i = 0; i < groups.length; i++) {
+      maxCards = Math.max(maxCards, groups[i].querySelectorAll('.fbv').length);
+    }
+    var rowCap = Math.min(4, Math.max(2, maxCards));
+    // largest card size that still fits the height (charts FILL the
+    // vertical space; band alignment holds wherever the sizes allow)
+    function setW(w) {
+      col.style.setProperty('--fbv-w', w + 'px');
+      col.style.width = (rowCap * (w + 8) + 8) + 'px';
+    }
+    var lo = 84, hi = 210, best = 84;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      setW(mid);
+      if (cascade(false).bottom <= base + 1) { best = mid; lo = mid + 1; }
+      else { hi = mid - 1; }
+    }
+    setW(best);
+    cascade(true);
   }
 
   /* ---------- practice mode: step the progression through one position ----------
@@ -1275,7 +1417,7 @@
       });
     });
 
-    // controls
+    // controls (right column; the neck is prepended after everything is built)
     var out = ['<div class="pr-controls">'];
     out.push('<span class="ts-sub">Position</span><span class="pos-seg">');
     positions.forEach(function (pp) {
@@ -1315,12 +1457,6 @@
       '<button class="icon pr-navbtn" data-act="practice-next" title="Next chord (space)">›</button>' +
       '</div>');
 
-    out.push('<div class="pr-neck">' + FB.renderNeckSVG({
-      fretCount: 15, dots: dots, windows: windows,
-      ariaLabel: cur.sym + ' triad in the ' + p.shape + '-shape position, ' +
-        ctx.key.name + ' pentatonic box'
-    }) + '</div>');
-
     // progression rail
     out.push('<div class="pr-rail">');
     ctx.seq.forEach(function (step, i) {
@@ -1330,7 +1466,19 @@
     });
     out.push('</div>');
     out.push('<div class="pr-hint">space / → next · ← back · 1–5 or [ ] position · esc back to song</div>');
-    return out.join('');
+    var neckHtml = '<div class="pr-neck">' + FB.renderNeckSVG({
+      fretCount: 15, dots: dots, windows: windows,
+      ariaLabel: cur.sym + ' triad in the ' + p.shape + '-shape position, ' +
+        ctx.key.name + ' pentatonic box'
+    }) + '</div>';
+    // info first in the right column (what you watch mid-practice), then
+    // the set-and-forget controls, the rail, and the hint
+    var infoIdx = -1;
+    for (var oi = 0; oi < out.length; oi++) {
+      if (out[oi].indexOf('<div class="pr-info">') === 0) { infoIdx = oi; break; }
+    }
+    var info = infoIdx >= 0 ? out.splice(infoIdx, 1)[0] : '';
+    return neckHtml + '<div class="pr-rest">' + info + out.join('') + '</div>';
   }
 
   function practiceHTML() {

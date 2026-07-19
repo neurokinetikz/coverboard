@@ -34,10 +34,11 @@ instrumental=green, outro=gray). Tap a section header to collapse it.
 
 ## Follow mode
 
-Tap **🎤** in the song toolbar, start singing, and the app highlights the
-line you're on — scrolling it into view as you go (in Fit mode it highlights
-without scrolling). Tap any lyric line while listening to re-sync. It never
-listens unless you turn it on.
+Tap **🎤** next to the song title, start singing, and the app follows you:
+the current line highlights (teleprompter-style — it advances the moment you
+finish a line) and the words light up as you sing them, karaoke-style.
+Outside Fit mode the highlighted line scrolls into view. Tap any lyric line
+while listening to re-sync. It never listens unless you turn it on.
 
 Under the hood this is *alignment*, not transcription: the lyrics are known,
 so even the noisy recognition you get while strumming is plenty to track
@@ -45,8 +46,7 @@ position. The current engine is the browser's built-in speech recognition —
 which means **Chrome, an internet connection, and your audio being processed
 by the browser's speech service** while following. If the mic is blocked when
 opening `index.html` directly from disk, serve it locally instead:
-`python3 -m http.server` then `http://localhost:8000`. Recognition is a
-swappable engine — a fully offline on-device engine is planned.
+`python3 -m http.server` then `http://localhost:8000`.
 
 ## Learn: triads & CAGED
 
@@ -99,18 +99,22 @@ Transpose the song and the strip follows, including the position labels.
 
 ## Learn: fretboard explorer
 
-**Fretboard** in the sidebar (or "Explore neck →" from the strip) opens a
-full-width neck view: pick any root (sharp and flat spellings are separate
-buttons — tapping `F♯` vs `G♭` spells everything accordingly) and any quality
-(maj, min, 7, m7, maj7, 6, m6, dim, aug, sus2, sus4). You get:
+**Fretboard** in the sidebar (or "Explore neck →" from the strip) opens the
+neck the way you actually see it: **vertical, nut at the top, low E on the
+left** — the same orientation as every chord chart. Pick any root (sharp and
+flat spellings are separate buttons — tapping `F♯` vs `G♭` spells everything
+accordingly) and any quality (maj, min, 7, m7, maj7, 6, m6, dim, aug, sus2,
+sus4). You get:
 
 - every chord tone across 15 frets, labeled by **interval** (default) or note name
+- the discrete voicing charts **beside the neck, grouped by CAGED position and
+  aligned with their frets** — the 3fr voicings sit next to fret 3; the whole
+  layout sizes itself to fill your screen. Tap any chart to open substitutions
 - a **scale layer** (`none | pentatonic | full scale`) — scale tones as small ghost
   dots behind the chord tones, so you see the triad-inside-the-box relationship;
   chord-correct flavors (minor pent / major pent; Mixolydian for 7ths, Dorian for m6)
 - a **string set + inversion filter** that narrows the cloud to actual closed voicings
-- an optional **CAGED overlay** shading the five position windows
-- the discrete voicing charts below the neck — tap any to open substitutions
+- an optional **CAGED overlay** shading the five position windows as bands
 
 And in the song view: a **scales column** pins to the right edge — all five
 CAGED positions, nut first, in two stacks (the key's flavor and its parallel,
@@ -164,7 +168,7 @@ chain deeper; `‹` walks back.
 - **Transpose** — ± semitones with correct flat/sharp spelling for the target key.
 - **Fit mode** — ⛶ fits the entire song on screen in auto-sized columns
   (binary-searches the largest font that fits). Toggle off for scroll + autoscroll.
-- **Autoscroll** — ▶ button or spacebar; speed slider in the toolbar.
+- **Autoscroll** — spacebar toggles a smooth scroll (speed persists in settings).
 - **Setlists** — build, reorder, and Perform (arrow keys flip between songs).
 - **Library file sync** — link a local JSON file (Settings ⚙) and every change
   streams to it; a browser-data wipe can never lose your songs. Newer side wins
@@ -207,6 +211,46 @@ both `index.html` and `build.js` (the build fails loudly if they drift).
 node tests/run.js
 ```
 
-1023 assertions across the parser, chord theory, voicing generator, triad/CAGED
-engine (including hand-verified fret literals), substitution rule tables, and
-both SVG renderers. Pure Node — no browser or DOM required.
+1524 assertions across the parser, chord theory, voicing generator, triad/CAGED
+engine (including hand-verified fret literals), substitution rule tables, both
+SVG renderers, and the full Follow-mode stack (aligner, feeder, tracker, and
+the engine/controller driven by a fake recognizer). Pure Node — no browser or
+DOM required.
+
+### Browser battery
+
+```
+npm install          # once — playwright-core (dev-only; the app has no deps)
+node tests/browser/all.js
+```
+
+Drives the real app in headless Chrome (must be installed): the Follow-mode
+e2e with a scripted fake recognizer (line + word tracking, teleprompter
+advance, tap-to-seek, teardown), the exclusive Chords/Triads toggles,
+back/forward routing, responsive layout (scales-column hug, viewport-scaled
+strip cards, fit-mode reflow, print sizing), and the vertical fretboard
+(orientation, position-aligned chart groups, fit-to-height). This covers the
+app.js DOM glue and CSS layout that the Node suite structurally cannot see.
+Each file in `tests/browser/` also runs standalone.
+
+## Privacy
+
+Everything is local: songs live in your browser (plus the optional linked
+file), there is no server, no account, no analytics, no network calls — with
+one explicit exception: while **Follow mode** is listening, audio is processed
+by the browser's built-in speech service (Chrome sends it to Google's
+recognizer). The mic never activates unless you tap it.
+
+## Contributing
+
+`node tests/run.js` must stay green (pure Node, no browser); `npm install &&
+node tests/browser/all.js` runs the headless-Chrome battery. New modules are
+plain IIFEs exporting to `window` + CommonJS, registered in both `index.html`
+and `build.js` (the build asserts if they drift). Follow mode's recognition
+layer is a swappable seam — alternative engines implement
+`registerEngine({id, available, start, stop})` in `js/follow.js` and
+everything above it (alignment, karaoke, UI) just works.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
