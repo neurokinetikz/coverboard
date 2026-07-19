@@ -33,5 +33,5 @@ if (html.indexOf('src="js/') !== -1) {
 }
 
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
-fs.writeFileSync(path.join(root, 'dist', 'songbook.html'), html);
+fs.writeFileSync(path.join(root, 'dist', 'coverboard.html'), html);
 console.log('dist/coverboard.html written (' + (html.length / 1024).toFixed(0) + ' KB)');
