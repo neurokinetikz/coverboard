@@ -5,6 +5,7 @@
   "scripts": {
     "test": "node tests/run.js",
     "test:browser": "node tests/browser/all.js",
+    "test:mobile": "node tests/browser/mobile-song.e2e.js && node tests/browser/mobile-matrix.smoke.js",
     "build": "node build.js"
   },
   "devDependencies": {

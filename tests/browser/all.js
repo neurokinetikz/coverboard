@@ -12,7 +12,8 @@ catch (e) {
   process.exit(1);
 }
 
-var files = ['follow.e2e.js', 'strips.smoke.js', 'backnav.smoke.js', 'layout.smoke.js', 'fretboard.smoke.js'];
+var files = ['follow.e2e.js', 'strips.smoke.js', 'backnav.smoke.js', 'layout.smoke.js', 'fretboard.smoke.js',
+             'mobile-song.e2e.js', 'mobile-matrix.smoke.js'];
 var failed = 0;
 
 files.forEach(function (f) {

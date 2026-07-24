@@ -91,7 +91,9 @@ H.launch({ fakeSpeech: true }).then(async function (env) {
   await page.keyboard.press(' ');
   await page.waitForSelector('#follow-btn:not(.listening)');
   check(await page.$('.sung-cur') === null, 'autoscroll stops follow and clears highlight');
-  check(await page.$('#autoscroll-btn') === null, 'autoscroll toolbar button removed');
+  check(await page.$eval('#autoscroll-btn', function (b) {
+    return getComputedStyle(b).display === 'none';
+  }), 'autoscroll button hidden on desktop (touch-only affordance)');
   await page.keyboard.press(' ');
 
   // fit mode: highlight moves, word marks survive the re-render

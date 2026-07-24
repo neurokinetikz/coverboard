@@ -30,11 +30,15 @@ function harness(name) {
 
 function launch(opts) {
   opts = opts || {};
-  return playwright.chromium.launch({ channel: 'chrome', headless: true })
+  var headless = !process.env.HEADED;
+  return playwright.chromium.launch({ channel: 'chrome', headless: headless })
     .then(function (browser) {
-      return browser.newContext({
-        viewport: opts.viewport || { width: 1400, height: 900 }
-      }).then(function (ctx) {
+      var ctxOpts = { viewport: opts.viewport || { width: 1400, height: 900 } };
+      // device emulation etc. (mobile battery) — merged over the defaults
+      if (opts.context) {
+        for (var k in opts.context) ctxOpts[k] = opts.context[k];
+      }
+      return browser.newContext(ctxOpts).then(function (ctx) {
         var init = Promise.resolve();
         if (opts.fakeSpeech) init = ctx.addInitScript(installFakeSR);
         return init.then(function () { return ctx.newPage(); })
@@ -83,4 +87,6 @@ function installFakeSR() {
   };
 }
 
-module.exports = { APP: APP, harness: harness, launch: launch };
+module.exports = {
+  APP: APP, harness: harness, launch: launch, installFakeSR: installFakeSR
+};
