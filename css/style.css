@@ -81,22 +81,34 @@ button.danger { color: var(--danger); }
    13px — scale them all to fill the box like the 🗑 emoji does */
 button.icon { padding: 3px 7px; line-height: 1.25; font-size: 20px; }
 button.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+/* touch: no double-tap zoom on rapid-tap controls (inert with a mouse) */
+button, .dg, .ts-scale, .songitem, .group-head, .strip-rail, .pr-chip {
+  touch-action: manipulation;
+}
 input[type="text"], input[type="number"], textarea, select {
   font-family: inherit; font-size: 14px; color: var(--text);
   background: var(--bg-inset); border: 1px solid var(--border);
   border-radius: 7px; padding: 7px 10px; outline: none;
+  max-width: 100%;
 }
 input:focus, textarea:focus { border-color: var(--accent); }
 input[type="range"] { accent-color: var(--accent); }
 
 /* ---------- layout ---------- */
 
-#app { display: flex; height: 100vh; }
+#app {
+  display: flex; height: 100vh; height: 100dvh;
+  /* viewport-fit=cover: keep content clear of notches/rounded corners */
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
 
 .sidebar {
   width: 290px; min-width: 290px; display: flex; flex-direction: column;
   background: var(--bg-panel); border-right: 1px solid var(--border);
 }
+/* tap-to-close backdrop behind the mobile drawer (shown ≤760px only) */
+.scrim { display: none; }
 /* desktop: ☰ collapses the panel (slides out left); on mobile the same
    button drives the slide-in drawer below instead */
 @media (min-width: 761px) {
@@ -270,6 +282,10 @@ button.tb-mic {
   background: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px;
   box-shadow: 0 10px 34px rgba(0, 0, 0, 0.35);
   padding: 12px; min-width: 250px;
+  /* short landscape viewports: scroll within rather than clip the bottom
+     keys (fixed elements don't move with page scroll) */
+  max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px);
+  overflow-y: auto;
 }
 .key-menu .km-title { font-size: 12px; font-weight: 700; color: var(--text-dim); margin-bottom: 8px; }
 .key-menu .km-sub { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-dim); margin: 8px 0 4px; }
@@ -288,7 +304,10 @@ button.tb-mic {
 
 /* ---------- song content ---------- */
 
-.song-scroll { flex: 1; overflow-y: auto; scroll-behavior: auto; }
+/* overflow-x hidden: one over-long tab/chord segment must scroll within its
+   own line (below), never pan the whole sheet sideways */
+.song-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; scroll-behavior: auto; }
+.song-scroll, .songlist { overscroll-behavior-y: contain; }
 .song-body { max-width: 860px; margin: 0 auto; padding: 18px 22px 50vh; }
 
 /* fit-to-viewport mode: the whole song in dynamically sized columns */
@@ -336,7 +355,17 @@ button.tb-mic {
 }
 /* charts shrink equally so the whole strip stays on one centered line no
    matter how many chords the song has; flex-basis is the max (roomy) size */
-.diagram-strip { flex-wrap: nowrap; justify-content: center; overflow-x: auto; position: relative; }
+.diagram-strip { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; position: relative; }
+/* non-scrolling anchor for the ⌃ collapse button; the wide side padding on
+   the strip keeps the last card clear of the button at scroll end */
+.strip-box { position: relative; }
+.strip-box .diagram-strip { padding: 10px 40px 6px; }
+/* center when the cards fit, scroll from the true start when they don't —
+   plain `center` clips the left cards of an overflowing strip. The auto
+   margins on the edge spacers absorb free space (= centered) and collapse
+   to zero under overflow (= scrollable from card 1). */
+.diagram-strip::before, .diagram-strip::after,
+.ts-tiles::before, .ts-tiles::after { content: ""; margin: auto; }
 .diagram-strip .dg {
   cursor: pointer; border-radius: 8px; padding: 2px;
   /* cards scale with the viewport: full size on big monitors, smaller on
@@ -409,8 +438,9 @@ html[data-theme="light"] .chord-svg .cd-role { fill: #ffffff; }
 .line.lyric-only { white-space: pre-wrap; }
 .line.comment { color: var(--text-dim); font-style: italic; font-size: 0.92em; padding: 2px 0; }
 
-/* chord-over-lyric segments */
-.cl { white-space: pre-wrap; }
+/* chord-over-lyric segments; a single unbreakable segment wider than the
+   sheet scrolls within its own line, like .chordrow and pre.tabline do */
+.cl { white-space: pre-wrap; overflow-x: auto; }
 .cl .seg { display: inline-block; vertical-align: bottom; white-space: pre; }
 .cl .seg .c {
   display: block; min-height: 1.25em; line-height: 1.2;
@@ -442,7 +472,8 @@ pre.tabline {
 .modal {
   background: var(--bg-panel); border: 1px solid var(--border); border-radius: 14px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-  width: min(96vw, 1060px); max-height: 92vh; display: flex; flex-direction: column;
+  width: min(96vw, 1060px); max-height: 92vh; max-height: 92dvh;
+  display: flex; flex-direction: column;
 }
 .modal.small { width: min(94vw, 480px); }
 .modal.subs { width: min(94vw, 600px); }
@@ -542,7 +573,8 @@ pre.tabline {
 
 /* toast */
 #toast {
-  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  position: fixed; bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%); max-width: 92vw;
   background: var(--text); color: var(--bg); font-size: 13.5px; font-weight: 600;
   padding: 9px 18px; border-radius: 24px; box-shadow: var(--shadow);
   opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 99;
@@ -555,7 +587,10 @@ pre.tabline {
   background: var(--bg-inset); border-bottom: 1px solid var(--border);
   font-size: 13px;
 }
-.perform-bar .pos { color: var(--text-dim); margin-right: auto; }
+.perform-bar .pos {
+  color: var(--text-dim); margin-right: auto;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* ---------- triad strip (song view) ---------- */
 
@@ -578,7 +613,7 @@ pre.tabline {
 .pos-seg .mini.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .ts-explore { margin-left: 6px; color: var(--accent); }
 .ts-tiles {
-  display: flex; gap: 6px; flex-wrap: nowrap; justify-content: center;
+  display: flex; gap: 6px; flex-wrap: nowrap; justify-content: flex-start;
   align-items: flex-start; overflow-x: auto;
 }
 .ts-tile {
@@ -869,16 +904,69 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
 
 @media (max-width: 900px) {
   .scale-col { display: none; }
+  /* keep the single-row toolbar, but the side rails scroll instead of
+     wrap-exploding (tablet portrait, phone landscape) */
+  .song-tb .tb-left, .song-tb .tb-right {
+    min-width: 0; flex-wrap: nowrap; overflow-x: auto;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .song-tb .tb-left::-webkit-scrollbar,
+  .song-tb .tb-right::-webkit-scrollbar { display: none; }
+  /* rail items keep natural width — the rail scrolls, nothing squishes */
+  .song-tb .tb-left > *, .song-tb .tb-right > * { flex: 0 0 auto; }
+  /* right-edge fade hints at off-screen controls; the padding keeps the
+     last button clear of the fade at scroll end (and hides the fade
+     entirely when the rail fits) */
+  .song-tb .tb-left, .song-tb .tb-right {
+    padding-right: 24px;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
+    mask-image: linear-gradient(90deg, #000 calc(100% - 18px), transparent);
+  }
+  /* iOS zooms the page onto any focused control under 16px — match it */
+  input[type="text"], input[type="number"], textarea, select { font-size: 16px; }
+}
+@media (min-width: 901px) {
+  /* autoscroll is a touch affordance (no spacebar): the button is always
+     rendered, wide pointer-and-keyboard screens hide it */
+  #autoscroll-btn { display: none; }
 }
 @media (max-width: 760px) {
   .sidebar { position: fixed; z-index: 40; height: 100%; transform: translateX(-100%); transition: transform 0.2s; }
-  /* phones: controls stack above the neck at a fixed comfortable height */
+  .sidebar { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  /* phones: controls stack above the neck at a fixed comfortable height
+     (svh: stable bound — dvh would resize the neck as the URL bar hides) */
   #fb-body, #practice-body, .fb-main { flex-direction: column; height: auto; }
   .fb-rest, .pr-rest { order: -1; overflow: visible; }
-  .fb-wrap svg, .pr-neck svg { height: 72vh; width: auto; margin: 0 auto; }
+  .fb-wrap svg, .pr-neck svg { height: 72vh; height: 72svh; width: auto; margin: 0 auto; }
+  /* CAGED chart groups flow below the neck; positionFbGroups stands down */
+  .fb-poscol { position: static; width: auto !important; }
+  .fb-posgroup { position: static; }
   .sidebar.open { transform: translateX(0); box-shadow: 0 0 40px rgba(0,0,0,0.4); }
+  .sidebar.open ~ .scrim {
+    display: block; position: fixed; inset: 0; z-index: 35;
+    background: rgba(10, 12, 16, 0.45);
+  }
   .import-grid { grid-template-columns: 1fr; }
   .song-body { padding: 12px 12px 40vh; }
+  /* song toolbar: title row on top, then key/capo, then a swipeable
+     controls rail — every control stays reachable, nothing hides */
+  .toolbar.song-tb { display: flex; flex-wrap: wrap; padding: 8px 10px; }
+  .song-tb .tb-center { order: -1; flex: 1 1 100%; }
+  .song-tb .tb-left, .song-tb .tb-right { flex: 1 1 100%; }
+  .song-tb .tb-key-lbl { display: none; }   /* the accent chip is self-labeling */
+  .song-tb button { min-height: 38px; }
+  button.tb-mic { height: 40px; width: 40px; font-size: 19px; }
+  .toolbar .titleblock .t { font-size: 19px; }
+  .strip-collapse { font-size: 15px; padding: 6px 10px; }
+  /* substitutions: one card per row — two columns leave no room for the
+     why-text beside the fixed-width chart */
+  .sub-items { grid-template-columns: 1fr; }
+  .modal-head, .modal-body { padding-left: 12px; padding-right: 12px; }
+  /* perform bar: position line on top, thumb-width buttons below */
+  .perform-bar { flex-wrap: wrap; padding: 6px 10px; }
+  .perform-bar .pos { flex: 1 1 100%; margin-right: 0; }
+  .perform-bar button { min-height: 38px; flex: 1 1 auto; }
 }
 
 /* ---------- print ---------- */
@@ -895,7 +983,9 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
   .line .w.sung { color: inherit; font-weight: inherit; }
   .ts-flag { display: none; }
   /* paper has no horizontal scroll — let strips wrap when printing */
-  .ts-tiles, .diagram-strip { flex-wrap: wrap; overflow: visible; }
+  .ts-tiles, .diagram-strip { flex-wrap: wrap; overflow: visible; justify-content: center; }
+  .ts-tiles::before, .ts-tiles::after,
+  .diagram-strip::before, .diagram-strip::after { content: none; }
   /* paper vmin would shrink cards — keep printed charts full size */
   .diagram-strip .dg, .ts-tile { flex-basis: 170px; }
   /* dark-theme tokens stay active during print — force ink-on-paper for the

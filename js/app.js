@@ -203,9 +203,12 @@
   function diagramStripHTML(parsed, tr, flat, song) {
     if (!parsed.chords.length) return '';
     var settings = Store.getSettings();
-    var seen = {}, out = ['<div class="diagram-strip">' +
+    // the ⌃ anchors to .strip-box, NOT the scroller — otherwise it scrolls
+    // away with the cards on narrow screens
+    var seen = {}, out = ['<div class="strip-box">' +
       '<button class="icon strip-collapse" data-act="toggle-strip" ' +
-      'title="Collapse the chord charts">⌃</button>'];
+      'title="Collapse the chord charts">⌃</button>' +
+      '<div class="diagram-strip">'];
     parsed.chords.forEach(function (sym) {
       var d = dispChord(sym, tr, flat);
       var p = CT.parseChord(d);
@@ -218,7 +221,7 @@
         '" title="' + esc(d) + ' — tap for substitutions">' +
         DG.renderChordSVG(voicings[0], { label: d, showFingers: settings.showFingers }) + '</span>');
     });
-    out.push('</div>');
+    out.push('</div></div>');
     return out.length > 2 ? out.join('') : '';
   }
 
@@ -567,7 +570,11 @@
 
   function render() {
     var app = $('#app');
-    app.innerHTML = sidebarHTML() + '<div class="main" id="main">' + mainHTML() + '</div>';
+    // the scrim sits between drawer and content on phones; its data-act
+    // rides the same delegation as the ☰ button, so tapping it closes
+    app.innerHTML = sidebarHTML() +
+      '<div class="scrim" data-act="toggle-sidebar"></div>' +
+      '<div class="main" id="main">' + mainHTML() + '</div>';
     var sb = $('#sidebar');
     if (App.state.sidebarOpen) sb.classList.add('open');
     if (Store.getSettings().sidebarCollapsed) sb.classList.add('collapsed');
@@ -883,6 +890,14 @@
         '<button data-act="font" data-d="1">＋</button>' +
       '</div>' +
       '<button data-act="toggle-fit" class="' + (fit ? 'active' : '') + '" title="Fit the whole song on screen in columns">⛶ Fit</button>' +
+      // touch devices have no spacebar: always render the autoscroll
+      // button and let CSS hide it on wide screens — a width check here
+      // would go stale on rotation (resize never re-renders). Fit mode
+      // has nothing to scroll (same guard as the Space handler).
+      (!fit
+        ? '<button id="autoscroll-btn" data-act="autoscroll" title="Auto-scroll">' +
+          (Auto.on ? '⏸' : '▶') + '</button>'
+        : '') +
       '<button data-act="toggle-diagrams" class="' + (settings.showDiagrams ? 'active' : '') + '" title="Chord diagrams">◫ Chords</button>' +
       '<button data-act="toggle-triads" class="' + (settings.showTriads ? 'active' : '') + '" title="Triad charts at CAGED positions">△ Triads</button>' +
       '<button data-act="edit-song" class="icon" title="Edit">✎</button>' +
@@ -957,7 +972,9 @@
       '<button data-act="view-setlists">‹ All setlists</button></div>' +
       '<div class="page-pad"><ul class="setlist-songs">' + rows + '</ul>' +
       '<div style="display:flex;gap:8px;margin-top:14px">' +
-      '<select id="setlist-add-select" style="flex:1">' + opts + '</select>' +
+      // min-width:0 — otherwise the longest option title sets the row's
+      // minimum and shoves the Add button off narrow screens
+      '<select id="setlist-add-select" style="flex:1;min-width:0">' + opts + '</select>' +
       '<button class="primary" data-act="setlist-add">＋ Add song</button></div></div>';
   }
 
@@ -1231,6 +1248,13 @@
     var body = $('#fb-body');
     var col = body && $('.fb-poscol', body);
     if (!col) return;
+    if (window.innerWidth <= 760) {
+      // phones: groups flow statically below the neck (CSS) — clear any
+      // sizing a wider layout left behind and stand down
+      col.style.width = '';
+      col.style.removeProperty('--fbv-w');
+      return;
+    }
     var groups = col.querySelectorAll('.fb-posgroup');
     if (!groups.length) return;
     var base = col.clientHeight;      // poscol stretches to the fb-main row
@@ -2107,7 +2131,8 @@
     document.body.appendChild(menu);
     var r = anchor.getBoundingClientRect();
     menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
-    menu.style.top = (r.bottom + 6) + 'px';
+    menu.style.top = Math.max(8, Math.min(r.bottom + 6,
+      window.innerHeight - menu.offsetHeight - 8)) + 'px';
     setTimeout(function () {
       document.addEventListener('mousedown', function dismiss(e) {
         if (e.target.closest('#scales-menu') ||
@@ -2177,7 +2202,8 @@
     document.body.appendChild(menu);
     var r = anchor.getBoundingClientRect();
     menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
-    menu.style.top = (r.bottom + 6) + 'px';
+    menu.style.top = Math.max(8, Math.min(r.bottom + 6,
+      window.innerHeight - menu.offsetHeight - 8)) + 'px';
 
     setTimeout(function () {
       document.addEventListener('mousedown', function dismiss(e) {
