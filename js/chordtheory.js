@@ -247,6 +247,96 @@
     return out;
   }
 
+  /* ---------- roman numerals ---------- */
+
+  // Base numerals per chromatic degree above the key root (case applied from
+  // the quality). Major spells flat-side chromatics ♭; minor uses the
+  // natural-minor reference — III/VI/VII plain, matching detectKey's degree
+  // set and the subs-table labels — with ♯ for raised chromatic degrees.
+  var RN_MAJOR = ['I', '♭II', 'II', '♭III', 'III', 'IV', '♭V', 'V', '♭VI', 'VI', '♭VII', 'VII'];
+  var RN_MINOR = ['I', '♭II', 'II', 'III', '♯III', 'IV', '♭V', 'V', 'VI', '♯VI', 'VII', '♯VII'];
+  // Slash basses as Nashville digits. No quality to gate on, so degree 6 is
+  // always ♯4 (D/F# must read II/♯4) and the minor leading tone is ♯7.
+  var RN_BASS_MAJOR = ['1', '♭2', '2', '♭3', '3', '4', '♯4', '5', '♭6', '6', '♭7', '7'];
+  var RN_BASS_MINOR = ['1', '♭2', '2', '3', '♯3', '4', '♯4', '5', '6', '♯6', '7', '♯7'];
+  // Key degrees whose diatonic third is minor — cases power chords, which
+  // carry no third of their own (diatonic minor + diminished degrees).
+  var RN_MIN_DEGS = { major: { 2: 1, 4: 1, 9: 1, 11: 1 }, minor: { 0: 1, 2: 1, 5: 1, 7: 1 } };
+  // Ascending passing/common-tone dims spell sharp-side: C–C#°7–Dm7 is
+  // ♯i°7, never ♭ii°. Deg 6 applies in both modes; 1/3/8 are chromatic
+  // only in major (deg 3/8 are diatonic minor degrees).
+  var RN_DIM_RAISED = { 1: '♯I', 3: '♯II', 6: '♯IV', 8: '♯V' };
+
+  function rnGlyph(s) { return s.replace(/b/g, '♭').replace(/#/g, '♯'); }
+
+  // quality -> { lower: 'l'|'u'|'k', sym, suffix } ('k' = case from the key
+  // degree). Built once over QUALITIES so a future quality gets a sane
+  // default instead of a hole.
+  var RN_RENDER = (function () {
+    var special = {
+      '':        { lower: 'u', sym: '',  suffix: '' },
+      'maj':     { lower: 'u', sym: '',  suffix: '' },
+      'dim':     { lower: 'l', sym: '°', suffix: '' },
+      'dim7':    { lower: 'l', sym: '°', suffix: '7' },
+      'm7b5':    { lower: 'l', sym: 'ø', suffix: '' },
+      'aug':     { lower: 'u', sym: '+', suffix: '' },
+      'aug7':    { lower: 'u', sym: '+', suffix: '7' },
+      'augmaj7': { lower: 'u', sym: '+', suffix: 'maj7' },
+      '5':       { lower: 'k', sym: '',  suffix: '5' },
+      'sus':     { lower: 'u', sym: '',  suffix: 'sus4' }
+    };
+    var out = {};
+    Object.keys(QUALITIES).forEach(function (q) {
+      if (special.hasOwnProperty(q)) out[q] = special[q];
+      else if (/^m(?!aj)/.test(q)) out[q] = { lower: 'l', sym: '', suffix: rnGlyph(q.slice(1)) };
+      else out[q] = { lower: 'u', sym: '', suffix: rnGlyph(q) };
+    });
+    return out;
+  })();
+
+  /* Roman numeral of a chord in a key, e.g. G7 in C → "V7", Bm7b5 in Am →
+     "iiø", D/F# in C → "II/♯4". Takes a symbol string or a parseChord
+     result (hot render path skips the re-parse). Total: null when the
+     chord doesn't parse or there is no key; never throws. */
+  function romanNumeral(symOrParsed, keyPc, minor) {
+    if (typeof keyPc !== 'number' || !isFinite(keyPc)) return null;
+    var p = (symOrParsed && typeof symOrParsed === 'object' &&
+             typeof symOrParsed.rootPc === 'number' &&
+             typeof symOrParsed.quality === 'string')
+      ? symOrParsed : parseChord(symOrParsed);
+    if (!p) return null;
+    var k = ((keyPc % 12) + 12) % 12;
+    minor = !!minor;
+    var deg = ((p.rootPc - k) + 12) % 12;
+    var dimFamily = p.quality === 'dim' || p.quality === 'dim7' || p.quality === 'm7b5';
+    var base;
+    if (dimFamily && (deg === 6 || (!minor && RN_DIM_RAISED[deg]))) {
+      base = RN_DIM_RAISED[deg];                               // passing dim: ♯i° ♯ii° ♯iv° ♯v°
+    } else if (dimFamily && minor && deg === 11) {
+      base = 'VII';                                            // leading-tone vii°7
+    } else {
+      base = (minor ? RN_MINOR : RN_MAJOR)[deg];
+    }
+    var r = RN_RENDER[p.quality] ||
+            { lower: 'u', sym: '', suffix: rnGlyph(p.quality) };
+    var lower = r.lower === 'l' ||
+      (r.lower === 'k' && RN_MIN_DEGS[minor ? 'minor' : 'major'][deg] === 1);
+    var out = (lower ? base.toLowerCase() : base) + r.sym + r.suffix;
+    if (p.bassPc != null && p.bassPc !== p.rootPc) {
+      var bdig = (minor ? RN_BASS_MINOR : RN_BASS_MAJOR)[((p.bassPc - k) + 12) % 12];
+      // a chord-tone third in the bass takes its accidental from the chord,
+      // not the key: E/G# in C is III/♯5 (the chord's G#), never ♭6 (Ab)
+      var bint = ((p.bassPc - p.rootPc) + 12) % 12;
+      if (bint === 4 && bdig.charAt(0) === '♭') {
+        bdig = '♯' + (+bdig.charAt(1) === 1 ? 7 : +bdig.charAt(1) - 1);
+      } else if (bint === 3 && bdig.charAt(0) === '♯') {
+        bdig = '♭' + (+bdig.charAt(1) === 7 ? 1 : +bdig.charAt(1) + 1);
+      }
+      out += '/' + bdig;
+    }
+    return out;
+  }
+
   var api = {
     NOTE_TO_PC: NOTE_TO_PC,
     QUALITIES: QUALITIES,
@@ -256,7 +346,8 @@
     pcName: pcName,
     keyPrefersFlat: keyPrefersFlat,
     detectKey: detectKey,
-    chordPcs: chordPcs
+    chordPcs: chordPcs,
+    romanNumeral: romanNumeral
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

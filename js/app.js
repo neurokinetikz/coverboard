@@ -70,6 +70,13 @@
     return CT.transposeChord(sym, tr, flat);
   }
 
+  /* Roman numeral of a display symbol in an effectiveKey-shaped key
+     ({pc, minor} or null). Null when there is no key or no parse. */
+  function romanFor(sym, key) {
+    if (!key || !CT.romanNumeral) return null;
+    return CT.romanNumeral(sym, key.pc, key.minor);
+  }
+
   function bareChord(token) {
     var bare = token.replace(/^[({\[]+/, '').replace(/[)}\],.*]+$/, '');
     return CT.isChordSymbol(bare) ? bare : null;
@@ -209,6 +216,8 @@
       '<button class="icon strip-collapse" data-act="toggle-strip" ' +
       'title="Collapse the chord charts">⌃</button>' +
       '<div class="diagram-strip">'];
+    // chart names carry the numeral whenever the song's key is known
+    var rnKey = effectiveKey(song, parsed);
     parsed.chords.forEach(function (sym) {
       var d = dispChord(sym, tr, flat);
       var p = CT.parseChord(d);
@@ -217,9 +226,11 @@
       seen[key] = 1;
       var voicings = V.getVoicings(d, 1);
       if (!voicings.length) return;
+      var num = romanFor(d, rnKey);
       out.push('<span class="dg" data-chord="' + esc(d) + '" data-frets="' + voicings[0].frets.join(',') +
         '" title="' + esc(d) + ' — tap for substitutions">' +
-        DG.renderChordSVG(voicings[0], { label: d, showFingers: settings.showFingers }) + '</span>');
+        DG.renderChordSVG(voicings[0], { label: d, roman: num || '',
+          showFingers: settings.showFingers }) + '</span>');
     });
     out.push('</div></div>');
     return out.length > 2 ? out.join('') : '';
@@ -382,11 +393,16 @@
         out.push('<span class="ts-missing">no ' + esc(c.triad.label) + '</span>');
       } else {
         var v = pick.best;
+        // numeral for the song's chord (not the reduced triad — .ts-orig
+        // already narrates the reduction); EXPLICIT key only, so both
+        // strips agree on keyless songs
+        var tnum = romanFor(c.sym, key);
         out.push('<span class="dg" data-triad="' + esc(c.triad.label) +
           '" data-frets="' + v.frets.join(',') + '" title="' +
           esc(c.triad.label + ' — strings ' + v.stringSet + ', ' + triadInvName(v.inversion) +
               ' (tap for all triads)') + '">' +
-          DG.renderChordSVG(v, { label: c.triad.label, showFingers: false,
+          DG.renderChordSVG(v, { label: c.triad.label, roman: tnum || '',
+                                 showFingers: false,
                                  roles: triadRoles(v) }) + '</span>');
         // no badges under the strip charts — the fret label already says
         // where the grip sits, and off-pos/±fr read as clutter (user call)
@@ -1796,6 +1812,9 @@
     var stack = opts.stack || [];
     var settings = Store.getSettings();
     var parsed = CT.parseChord(sym);
+    // numeral for the clicked chord — rhymes with the candidates' .sub-roman
+    var curRoman = ctx.keyPc != null && CT.romanNumeral
+      ? CT.romanNumeral(sym, ctx.keyPc, ctx.minor) : null;
 
     // ---- top chart (the voicing that was clicked) ----
     var topHtml = null, topFrets = null, voicings = null, idx = 0;
@@ -1829,7 +1848,7 @@
         topFrets = v.frets;
         // default viewBox scaled up by CSS, so the name/markers keep the same
         // proportions as every other chart in the app
-        topHtml = DG.renderChordSVG(v, { label: sym,
+        topHtml = DG.renderChordSVG(v, { label: sym, roman: curRoman || '',
             showFingers: false, roles: triadRoles(v) }) +
           '<div class="vp-cap">' + esc(triadInvName(v.inversion)) + '</div>';
       }
@@ -1930,7 +1949,8 @@
     } else {
       var drawTop = function () {
         $('#voicing-big', bd).innerHTML = DG.renderChordSVG(voicings[idx],
-          { label: sym, showFingers: settings.showFingers });
+          { label: sym, roman: curRoman || '',
+            showFingers: settings.showFingers });
         topFrets = voicings[idx].frets;
         var n = $('#vp-num', bd);
         if (n) {

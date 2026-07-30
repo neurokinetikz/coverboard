@@ -105,6 +105,102 @@ function deepEq(a, b, name) {
   eq(CT.keyPrefersFlat(2, true), true, 'D minor prefers flats');
 })();
 
+/* ============ roman numerals ============ */
+
+(function () {
+  var rn = CT.romanNumeral;
+
+  // major-key degree table (C major)
+  eq(rn('C', 0, false), 'I', 'C in C = I');
+  eq(rn('Dm', 0, false), 'ii', 'Dm in C = ii');
+  eq(rn('Em', 0, false), 'iii', 'Em in C = iii');
+  eq(rn('F', 0, false), 'IV', 'F in C = IV');
+  eq(rn('G', 0, false), 'V', 'G in C = V');
+  eq(rn('Am', 0, false), 'vi', 'Am in C = vi');
+  eq(rn('Bdim', 0, false), 'vii°', 'Bdim in C = vii°');
+  eq(rn('Db', 0, false), '♭II', 'Db in C = ♭II');
+  eq(rn('Eb', 0, false), '♭III', 'Eb in C = ♭III');
+  eq(rn('Ab', 0, false), '♭VI', 'Ab in C = ♭VI');
+  eq(rn('Bb', 0, false), '♭VII', 'Bb in C = ♭VII');
+  eq(rn('Db7', 0, false), '♭II7', 'tritone sub Db7 in C = ♭II7');
+  eq(rn('F#dim', 0, false), '♯iv°', 'passing dim F#dim in C = ♯iv°');
+  eq(rn('Gb', 0, false), '♭V', 'non-dim tritone Gb in C = ♭V');
+  // ascending passing/common-tone dims spell sharp-side
+  eq(rn('C#dim7', 0, false), '♯i°7', 'C–C#°7–Dm7 walkup: ♯i°7');
+  eq(rn('D#dim7', 0, false), '♯ii°7', 'D#dim7 in C = ♯ii°7');
+  eq(rn('G#dim7', 0, false), '♯v°7', 'G–G#°7–Am walkup: ♯v°7');
+  eq(rn('C#m7b5', 0, false), '♯iø', 'C#m7b5 in C = ♯iø');
+
+  // minor-key degree table (A minor)
+  eq(rn('Am', 9, true), 'i', 'Am in Am = i');
+  eq(rn('Bdim', 9, true), 'ii°', 'Bdim in Am = ii°');
+  eq(rn('C', 9, true), 'III', 'C in Am = III');
+  eq(rn('Dm', 9, true), 'iv', 'Dm in Am = iv');
+  eq(rn('Em', 9, true), 'v', 'Em in Am = v (natural minor)');
+  eq(rn('E7', 9, true), 'V7', 'E7 in Am = V7 (harmonic-minor dominant)');
+  eq(rn('F', 9, true), 'VI', 'F in Am = VI');
+  eq(rn('G', 9, true), 'VII', 'G in Am = VII (unflattened)');
+  eq(rn('G#dim7', 9, true), 'vii°7', 'G#dim7 in Am = vii°7');
+  eq(rn('Bm7b5', 9, true), 'iiø', 'Bm7b5 in Am = iiø');
+
+  // quality classes
+  eq(rn('Cmaj7', 0, false), 'Imaj7', 'Cmaj7 = Imaj7');
+  eq(rn('G7', 0, false), 'V7', 'G7 = V7');
+  eq(rn('Am7', 0, false), 'vi7', 'Am7 = vi7');
+  eq(rn('Bm7b5', 0, false), 'viiø', 'Bm7b5 in C = viiø');
+  eq(rn('Caug', 0, false), 'I+', 'Caug = I+');
+  eq(rn('Gsus4', 0, false), 'Vsus4', 'Gsus4 = Vsus4');
+  eq(rn('B7sus4', 4, false), 'V7sus4', 'B7sus4 in E = V7sus4');
+  eq(rn('C5', 0, false), 'I5', 'power chord on major degree stays upper');
+  eq(rn('D5', 0, false), 'ii5', 'power chord on minor degree goes lower');
+  eq(rn('Eb5', 0, false), '♭III5', 'chromatic power chord stays upper');
+  eq(rn('B5', 0, false), 'vii5', 'power chord on the dim degree goes lower');
+  eq(rn('B5', 9, true), 'ii5', 'minor-key supertonic power chord goes lower');
+  eq(rn('G7b9', 0, false), 'V7♭9', 'alterations glyphed: G7b9 = V7♭9');
+  eq(rn('Ammaj7', 9, true), 'imaj7', 'Ammaj7 in Am = imaj7');
+  eq(rn('Cadd9', 0, false), 'Iadd9', 'Cadd9 = Iadd9');
+  eq(rn('Am6', 0, false), 'vi6', 'Am6 = vi6');
+
+  // slash basses: key-relative Nashville digits
+  eq(rn('C/E', 0, false), 'I/3', 'C/E = I/3');
+  eq(rn('G/B', 0, false), 'V/7', 'G/B = V/7');
+  eq(rn('Am/C', 0, false), 'vi/1', 'Am/C = vi/1');
+  eq(rn('D/F#', 0, false), 'II/♯4', 'D/F# = II/♯4');
+  eq(rn('E/G#', 9, true), 'V/♯7', 'E/G# in Am = V/♯7');
+  eq(rn('C/C', 0, false), 'I', 'redundant bass dropped');
+  // a chord-tone third in the bass takes the chord's accidental
+  eq(rn('E/G#', 0, false), 'III/♯5', 'E/G# in C = III/♯5, not ♭6');
+  eq(rn('A/C#', 0, false), 'VI/♯1', 'A/C# in C = VI/♯1, not ♭2');
+  eq(rn('Fm/Ab', 9, true), 'vi/♭1', 'Fm/Ab in Am spells the bass flat');
+
+  // transpose invariance: numeral(transposed sym, transposed key) is stable
+  ['C', 'Am7', 'G7/B', 'F#dim', 'Bb', 'Dsus4'].forEach(function (sym) {
+    [3, -5].forEach(function (st) {
+      eq(rn(CT.transposeChord(sym, st, true), ((0 + st) % 12 + 12) % 12, false),
+         rn(sym, 0, false), sym + ' numeral transpose-invariant @' + st);
+    });
+  });
+
+  // parsed-object input and totality
+  eq(rn(CT.parseChord('G7'), 0, false), 'V7', 'pre-parsed object input');
+  eq(rn('Hello', 0, false), null, 'non-chord word -> null');
+  eq(rn(null, 0, false), null, 'null sym -> null');
+  eq(rn('C', null, false), null, 'null key -> null');
+  eq(rn('C', undefined, false), null, 'undefined key -> null');
+  eq(rn('C', 12, false), 'I', 'keyPc 12 normalizes');
+  eq(rn('C', -12, false), 'I', 'keyPc -12 normalizes');
+
+  // chart labels: numeral rides as a smaller non-bold tspan, and the name
+  // centers over the GRID (padLeft 24 + gridW 61 / 2 = 54.5), not the SVG
+  var svg = DG.renderChordSVG(V.getVoicings('C', 1)[0], { label: 'C', roman: 'I' });
+  ok(svg.indexOf('<tspan class="cd-rn"') !== -1, 'chart numeral is a tspan');
+  ok(svg.indexOf('font-weight="400"> (I)</tspan>') !== -1, 'chart numeral non-bold in parens');
+  ok(svg.indexOf('x="54.5"') !== -1, 'chart name centered over the grid');
+  ok(svg.indexOf('aria-label="C (I) chord diagram"') !== -1, 'aria-label includes numeral');
+  var svg2 = DG.renderChordSVG(V.getVoicings('C', 1)[0], { label: 'C' });
+  ok(svg2.indexOf('cd-rn') === -1, 'no numeral -> no tspan');
+})();
+
 /* ============ parser: UG chords-over-lyrics ============ */
 
 (function () {

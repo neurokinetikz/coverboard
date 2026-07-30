@@ -39,6 +39,7 @@
     var W = opts.width || 96;
     var H = opts.height || 102;
     var label = opts.label || '';
+    var roman = opts.roman || '';    // numeral appended as " (I)", smaller
     var showFingers = opts.showFingers !== false;
     var roles = opts.roles || null;
 
@@ -81,11 +82,22 @@
     var out = [];
     out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H +
              '" width="' + W + '" height="' + H + '" class="chord-svg" role="img" aria-label="' +
-             esc(label || 'chord') + ' chord diagram">');
+             esc((label ? label + (roman ? ' (' + roman + ')' : '') : 'chord')) +
+             ' chord diagram">');
 
     if (label) {
-      out.push('<text x="' + (W / 2) + '" y="11" text-anchor="middle" class="cd-name" ' +
-               'font-size="11.5" font-weight="600">' + esc(label) + '</text>');
+      // long combined labels ("Bm7b5 (viiø)") shrink toward 8 so they stay
+      // inside the viewBox — the browser clips text past the SVG edge. The
+      // numeral tspan is smaller, so it counts at a discount.
+      var effLen = label.length + (roman ? (roman.length + 3) * 0.82 : 0);
+      var nameSize = effLen > 9
+        ? Math.max(8, 11.5 - (effLen - 9) * 0.45) : 11.5;
+      out.push('<text x="' + (padLeft + gridW / 2) + '" y="11" text-anchor="middle" class="cd-name" ' +
+               'font-size="' + nameSize + '" font-weight="600">' + esc(label) +
+               (roman
+                 ? '<tspan class="cd-rn" font-size="' + (nameSize * 0.82).toFixed(1) +
+                   '" font-weight="400"> (' + esc(roman) + ')</tspan>'
+                 : '') + '</text>');
     }
 
     // nut or top line
@@ -222,8 +234,12 @@
              esc(opts.ariaLabel || 'scale box') + '">');
 
     if (label) {
-      out.push('<text x="' + (W / 2) + '" y="11" text-anchor="middle" class="cd-name" ' +
-               'font-size="11.5" font-weight="600">' + esc(label) + '</text>');
+      // long labels shrink toward 8 so they stay inside the viewBox —
+      // the browser clips text past the SVG edge
+      var nameSize = label.length > 9
+        ? Math.max(8, 11.5 - (label.length - 9) * 0.45) : 11.5;
+      out.push('<text x="' + (padLeft + gridW / 2) + '" y="11" text-anchor="middle" class="cd-name" ' +
+               'font-size="' + nameSize + '" font-weight="600">' + esc(label) + '</text>');
     }
 
     if (base === 1) {

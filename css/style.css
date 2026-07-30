@@ -962,6 +962,7 @@ html[data-theme="light"] .fb-dot .fb-dot-label { fill: #ffffff; }
   /* substitutions: one card per row — two columns leave no room for the
      why-text beside the fixed-width chart */
   .sub-items { grid-template-columns: 1fr; }
+  .set-row button { min-height: 38px; }
   .modal-head, .modal-body { padding-left: 12px; padding-right: 12px; }
   /* perform bar: position line on top, thumb-width buttons below */
   .perform-bar { flex-wrap: wrap; padding: 6px 10px; }
