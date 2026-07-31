@@ -491,6 +491,38 @@
     return uniq.length ? CT.detectKey(uniq) : null;
   }
 
+  /* Unique chord roots of the song (UNTRANSPOSED pc + minor flavor), in
+     order of first appearance — the choices for the scales-root selector. */
+  function songScaleRoots(parsed) {
+    var seen = {}, out = [];
+    parsed.chords.forEach(function (sym) {
+      var p = CT.parseChord(sym);
+      if (!p) return;
+      var minor = /^m(?!aj)/.test(p.quality) ||
+        p.quality === 'dim' || p.quality === 'dim7';
+      var k = p.rootPc + '|' + (minor ? 1 : 0);
+      if (seen[k]) return;
+      seen[k] = 1;
+      out.push({ pc: p.rootPc, minor: minor });
+    });
+    return out;
+  }
+
+  /* The song's stored scales-root override, validated against the CURRENT
+     chord roots (edits can orphan it) — {pc, minor} untransposed, or null
+     to follow the song key (the default). */
+  function scaleRootOverride(song, parsed) {
+    var ov = song.scaleRoot;
+    if (!ov || typeof ov.pc !== 'number') return null;
+    var roots = songScaleRoots(parsed);
+    for (var i = 0; i < roots.length; i++) {
+      if (roots[i].pc === ov.pc && roots[i].minor === !!ov.minor) {
+        return { pc: ov.pc, minor: !!ov.minor };
+      }
+    }
+    return null;
+  }
+
   /* The scales column: all five CAGED positions, nut first, one row per
      position — the key's own pentatonic plus its PARALLEL flavor (the blues
      pairing), each in its own true pattern box nearest that neck region.
@@ -498,6 +530,9 @@
   function scaleColHTML(song, parsed, tr, flat) {
     if (!TR || !parsed.chords.length) return '';
     var key = songScaleKey(song, parsed, tr, flat);
+    // root override rides transpose exactly like the key does
+    var ov = scaleRootOverride(song, parsed);
+    if (ov) key = { pc: ((ov.pc + tr) % 12 + 12) % 12, minor: ov.minor };
     if (!key) return '';
     // collapsed: a slim rail on the right edge — click anywhere to reopen
     if (Store.getSettings().scalesCollapsed) {
@@ -544,6 +579,9 @@
       '<div class="ts-zone-head">' +
       '<span class="ts-lab">Scales:</span>' +
       '<div class="tgroup keygrp sc-kindgrp">' +
+      '<button class="sc-kind-btn sc-key-btn" data-act="scales-key-menu" ' +
+      'title="Scale root — the song key, or any chord root in the song">' +
+      esc(tonic + (key.minor ? 'm' : '')) + '</button>' +
       '<button class="sc-kind-btn" data-act="scales-kind-menu" ' +
       'title="Choose the scale — click to change">' + esc(SCALE_KIND_NAMES[kind]) + '</button>' +
       '</div>' +
@@ -2163,6 +2201,69 @@
     }, 0);
   }
 
+  function closeScalesKeyMenu() {
+    var m = $('#scales-key-menu');
+    if (m) m.remove();
+  }
+
+  /* scales-root popup: the song key (default), or any chord root in the
+     song — for soloing over a section from a different tonal center */
+  function openScalesKeyMenu(anchor) {
+    closeScalesKeyMenu();
+    var song = Store.getSong(App.state.songId);
+    if (!song) return;
+    var parsed = Store.parsedSong(song);
+    var tr = song.transpose || 0;
+    var flat = songPreferFlat(song, parsed, tr);
+    var sk = songScaleKey(song, parsed, tr, flat);
+    var ov = scaleRootOverride(song, parsed);
+    var menu = document.createElement('div');
+    menu.id = 'scales-key-menu';
+    menu.className = 'key-menu sc-menu';
+    var html = '<div class="km-title">Scale root…</div><div class="km-grid">';
+    if (sk) {
+      html += '<button data-clear="1" class="km-key' + (ov ? '' : ' cur') + '">' +
+        esc(CT.pcName(sk.pc, CT.keyPrefersFlat(sk.pc, sk.minor)) + (sk.minor ? 'm' : '')) +
+        '<span class="km-o">song key</span></button>';
+    }
+    songScaleRoots(parsed).forEach(function (r) {
+      var dispPc = ((r.pc + tr) % 12 + 12) % 12;
+      // skip the entry that duplicates the song key itself
+      if (sk && !ov && dispPc === sk.pc && r.minor === sk.minor) return;
+      var cur = ov && ov.pc === r.pc && ov.minor === r.minor;
+      html += '<button data-pc="' + r.pc + '" data-minor="' + (r.minor ? 1 : 0) +
+        '" class="km-key' + (cur ? ' cur' : '') + '">' +
+        esc(CT.pcName(dispPc, flat) + (r.minor ? 'm' : '')) + '</button>';
+    });
+    html += '</div>';
+    menu.innerHTML = html;
+    menu.addEventListener('click', function (e) {
+      var b = e.target.closest('.km-key');
+      if (!b) return;
+      Store.updateSong(song.id, {
+        scaleRoot: b.getAttribute('data-clear')
+          ? null
+          : { pc: parseInt(b.getAttribute('data-pc'), 10),
+              minor: b.getAttribute('data-minor') === '1' }
+      });
+      closeScalesKeyMenu();
+      updateScaleCol();
+    });
+    document.body.appendChild(menu);
+    var r = anchor.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+    menu.style.top = Math.max(8, Math.min(r.bottom + 6,
+      window.innerHeight - menu.offsetHeight - 8)) + 'px';
+    setTimeout(function () {
+      document.addEventListener('mousedown', function dismiss(e) {
+        if (e.target.closest('#scales-key-menu') ||
+            e.target.closest('[data-act="scales-key-menu"]')) return;
+        closeScalesKeyMenu();
+        document.removeEventListener('mousedown', dismiss);
+      });
+    }, 0);
+  }
+
   function openKeyMenu(anchor) {
     closeKeyMenu();
     var song = Store.getSong(App.state.songId);
@@ -2404,6 +2505,7 @@
       followStop();
       closeKeyMenu();
       closeScalesMenu();
+      closeScalesKeyMenu();
       render();
     }
   });
@@ -2579,6 +2681,10 @@
       case 'scales-kind-menu':
         if ($('#scales-menu')) closeScalesMenu();
         else openScalesMenu(actEl);
+        break;
+      case 'scales-key-menu':
+        if ($('#scales-key-menu')) closeScalesKeyMenu();
+        else openScalesKeyMenu(actEl);
         break;
       case 'view-practice':
         App.state.practice = { idx: 0 };
